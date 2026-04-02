@@ -1,0 +1,165 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+    cursor: none;
+  }
+
+  html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: #000000;
+    color: #e0e6f0;
+    font-family: 'Manrope', sans-serif;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    user-select: none;
+  }
+
+  #root {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  ::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer components {
+  .glass {
+    background: rgba(58, 64, 80, 0.6);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border: 1px solid rgba(46, 52, 71, 0.2);
+  }
+
+  .glass-sm {
+    background: rgba(22, 26, 38, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(74, 82, 104, 0.15);
+  }
+
+  .neon-focus {
+    box-shadow: 0 0 0 1px rgba(153, 247, 255, 0.2), 0 0 40px 8px rgba(153, 247, 255, 0.12);
+  }
+
+  .neon-focus-lg {
+    box-shadow: 0 0 0 1px rgba(153, 247, 255, 0.3), 0 0 80px 20px rgba(153, 247, 255, 0.18);
+  }
+
+  .card-poster {
+    aspect-ratio: 2/3;
+    border-radius: 2rem;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .card-album {
+    aspect-ratio: 1/1;
+    border-radius: 2rem;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .card-wide {
+    aspect-ratio: 16/9;
+    border-radius: 2rem;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .font-display {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+
+  .font-mono-tech {
+    font-family: 'Space Grotesk', monospace;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .hero-gradient {
+    background: linear-gradient(
+      to top,
+      rgba(0, 0, 0, 1) 0%,
+      rgba(0, 0, 0, 0.85) 25%,
+      rgba(0, 0, 0, 0.4) 60%,
+      rgba(0, 0, 0, 0) 100%
+    );
+  }
+
+  .hero-gradient-side {
+    background: linear-gradient(
+      to right,
+      rgba(12, 14, 19, 1) 0%,
+      rgba(12, 14, 19, 0.9) 30%,
+      rgba(12, 14, 19, 0.6) 55%,
+      rgba(12, 14, 19, 0) 100%
+    );
+  }
+
+  .seek-bar-glass {
+    background: rgba(153, 247, 255, 0.08);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(153, 247, 255, 0.12);
+    border-radius: 9999px;
+  }
+}
+
+@layer utilities {
+  .text-shadow-glow {
+    text-shadow: 0 0 30px rgba(153, 247, 255, 0.4);
+  }
+
+  .bg-gradient-radial {
+    background: radial-gradient(ellipse at center, var(--tw-gradient-stops));
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .no-tap-highlight {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Liquid cursor custom styles */
+.liquid-cursor {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  mix-blend-mode: screen;
+  will-change: transform;
+  transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              height 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.2s ease;
+}
+
+/* TV/fullscreen focus ring suppression */
+*:focus {
+  outline: none;
+}
+
+/* Smooth scrolling for media stages */
+.media-stage-scroll {
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+}
+
+.media-stage-item {
+  scroll-snap-align: start;
+}

@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Butu Air Mouse</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    :root {
+      --primary: #99f7ff;
+      --surface: #0c0e13;
+      --surface-low: #111520;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: #000;
+      color: #e0e6f0;
+      font-family: 'Space Grotesk', -apple-system, sans-serif;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      height: 100%;
+      padding: 2rem 1.5rem 3rem;
+    }
+
+    .header {
+      text-align: center;
+      width: 100%;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .brand-icon {
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #99f7ff, #00f1fe);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 900;
+      color: #001f24;
+      font-size: 14px;
+    }
+
+    .brand-name {
+      font-size: 1.4rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #4a5268;
+      transition: background 0.3s;
+    }
+
+    .status-dot.connected { background: var(--primary); animation: pulse 2s infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .status-text {
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #9aa3b4;
+    }
+
+    .touchpad {
+      flex: 1;
+      width: 100%;
+      max-width: 360px;
+      margin: 1.5rem 0;
+      border-radius: 2rem;
+      background: rgba(22, 26, 38, 0.8);
+      border: 1px solid rgba(153, 247, 255, 0.12);
+      backdrop-filter: blur(20px);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      touch-action: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .touchpad.active {
+      border-color: rgba(153, 247, 255, 0.3);
+      box-shadow: 0 0 40px 8px rgba(153, 247, 255, 0.1);
+    }
+
+    .touchpad-hint {
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .touchpad-hint p {
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(154, 163, 180, 0.5);
+      margin-top: 0.5rem;
+    }
+
+    .gyro-indicator {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(153, 247, 255, 0.2);
+      position: relative;
+      margin: 0 auto;
+    }
+
+    .gyro-dot {
+      position: absolute;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--primary);
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 12px 3px rgba(153, 247, 255, 0.4);
+      transition: transform 0.05s ease;
+    }
+
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      width: 100%;
+      max-width: 360px;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .btn {
+      flex: 1;
+      height: 56px;
+      border-radius: 1rem;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      transition: transform 0.1s, opacity 0.1s;
+      touch-action: manipulation;
+    }
+
+    .btn:active { transform: scale(0.95); opacity: 0.8; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #99f7ff 0%, #00f1fe 100%);
+      color: #001f24;
+      font-weight: 700;
+    }
+
+    .btn-secondary {
+      background: rgba(22, 26, 38, 0.9);
+      color: #9aa3b4;
+      border: 1px solid rgba(46, 52, 71, 0.5);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: #9aa3b4;
+      border: 1px solid rgba(46, 52, 71, 0.3);
+    }
+
+    .mode-toggle {
+      display: flex;
+      background: rgba(17, 21, 32, 0.8);
+      border: 1px solid rgba(46, 52, 71, 0.3);
+      border-radius: 0.875rem;
+      padding: 4px;
+      gap: 4px;
+    }
+
+    .mode-btn {
+      flex: 1;
+      height: 40px;
+      border: none;
+      border-radius: 0.625rem;
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+      touch-action: manipulation;
+    }
+
+    .mode-btn.active {
+      background: rgba(153, 247, 255, 0.12);
+      color: var(--primary);
+    }
+
+    .mode-btn:not(.active) {
+      background: transparent;
+      color: #4a5268;
+    }
+
+    .connection-panel {
+      width: 100%;
+      max-width: 360px;
+      padding: 1rem;
+      border-radius: 1rem;
+      background: rgba(22, 26, 38, 0.6);
+      border: 1px solid rgba(46, 52, 71, 0.3);
+      text-align: center;
+    }
+
+    .connection-panel p {
+      font-size: 0.7rem;
+      color: #9aa3b4;
+      letter-spacing: 0.06em;
+    }
+
+    .connection-panel input {
+      margin-top: 0.75rem;
+      width: 100%;
+      padding: 0.625rem 1rem;
+      border-radius: 0.625rem;
+      background: rgba(10, 12, 16, 0.8);
+      border: 1px solid rgba(46, 52, 71, 0.4);
+      color: #e0e6f0;
+      font-size: 0.875rem;
+      text-align: center;
+      letter-spacing: 0.05em;
+    }
+
+    .connect-btn {
+      margin-top: 0.625rem;
+      width: 100%;
+      padding: 0.625rem;
+      border-radius: 0.625rem;
+      background: rgba(153, 247, 255, 0.1);
+      border: 1px solid rgba(153, 247, 255, 0.2);
+      color: var(--primary);
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .permission-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.95);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 100;
+      padding: 2rem;
+      text-align: center;
+      gap: 1.5rem;
+    }
+
+    .permission-overlay h2 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .permission-overlay p {
+      font-size: 0.875rem;
+      color: #9aa3b4;
+      line-height: 1.6;
+      max-width: 280px;
+    }
+
+    .permission-btn {
+      padding: 0.875rem 2.5rem;
+      border-radius: 9999px;
+      background: linear-gradient(135deg, #99f7ff, #00f1fe);
+      color: #001f24;
+      font-weight: 700;
+      font-size: 0.875rem;
+      border: none;
+      cursor: pointer;
+    }
+
+    @media (min-height: 700px) {
+      .touchpad { min-height: 260px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="permission-overlay" class="permission-overlay">
+  <div class="brand">
+    <div class="brand-icon">B</div>
+    <span class="brand-name">Butu</span>
+  </div>
+  <h2>Air Mouse</h2>
+  <p>Butu needs access to your device's gyroscope and accelerometer to control the cursor.</p>
+  <button class="permission-btn" id="grant-btn">Enable Sensor Access</button>
+  <p style="font-size:0.65rem; opacity:0.4;">Point your phone at the screen and tilt to move the cursor</p>
+</div>
+
+<div id="app">
+  <div class="header">
+    <div class="brand">
+      <div class="brand-icon">B</div>
+      <span class="brand-name">Butu Air Mouse</span>
+    </div>
+    <div class="status-bar">
+      <div class="status-dot" id="status-dot"></div>
+      <span class="status-text" id="status-text">DISCONNECTED</span>
+    </div>
+  </div>
+
+  <div class="touchpad" id="touchpad">
+    <div class="touchpad-hint">
+      <div class="gyro-indicator">
+        <div class="gyro-dot" id="gyro-dot"></div>
+      </div>
+      <p id="mode-label">GYROSCOPE MODE</p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="mode-gyro">Gyroscope</button>
+      <button class="mode-btn" id="mode-touch">Touchpad</button>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-click">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+        SELECT
+      </button>
+      <button class="btn btn-secondary" id="btn-back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15,18 9,12 15,6"/></svg>
+        BACK
+      </button>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="btn-scroll-up">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18,15 12,9 6,15"/></svg>
+        SCROLL UP
+      </button>
+      <button class="btn btn-ghost" id="btn-scroll-down">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6,9 12,15 18,9"/></svg>
+        SCROLL DOWN
+      </button>
+    </div>
+
+    <div class="connection-panel">
+      <p>TV HOST ADDRESS</p>
+      <input type="text" id="host-input" placeholder="192.168.1.x" value="localhost" />
+      <button class="connect-btn" id="reconnect-btn">RECONNECT</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const WS_PORT = 9001;
+  let ws = null;
+  let mode = 'gyro';
+  let isConnected = false;
+  let sensorGranted = false;
+
+  const statusDot = document.getElementById('status-dot');
+  const statusText = document.getElementById('status-text');
+  const gyroDot = document.getElementById('gyro-dot');
+  const touchpad = document.getElementById('touchpad');
+  const hostInput = document.getElementById('host-input');
+  const permOverlay = document.getElementById('permission-overlay');
+  const modeLabel = document.getElementById('mode-label');
+
+  let lastBeta = 0, lastGamma = 0;
+  let sendInterval = null;
+
+  function setStatus(connected, label) {
+    isConnected = connected;
+    statusDot.className = 'status-dot' + (connected ? ' connected' : '');
+    statusText.textContent = label;
+  }
+
+  function connect(host) {
+    if (ws) { ws.close(); ws = null; }
+    try {
+      ws = new WebSocket(`ws://${host}:${WS_PORT}`);
+      ws.onopen = () => setStatus(true, 'CONNECTED · AIR MOUSE ACTIVE');
+      ws.onclose = () => {
+        setStatus(false, 'DISCONNECTED');
+        setTimeout(() => connect(hostInput.value || 'localhost'), 4000);
+      };
+      ws.onerror = () => ws.close();
+      ws.onmessage = () => {};
+    } catch(e) {
+      setStatus(false, 'CONNECTION FAILED');
+    }
+  }
+
+  function send(data) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(data));
+    }
+  }
+
+  function startGyroStream() {
+    if (sendInterval) clearInterval(sendInterval);
+    sendInterval = setInterval(() => {
+      send({
+        type: 'imu',
+        data: {
+          alpha: 0,
+          beta: lastBeta,
+          gamma: lastGamma,
+          timestamp: Date.now()
+        }
+      });
+    }, 16);
+  }
+
+  function stopGyroStream() {
+    if (sendInterval) { clearInterval(sendInterval); sendInterval = null; }
+  }
+
+  window.addEventListener('deviceorientation', (e) => {
+    if (mode !== 'gyro') return;
+    lastBeta = e.beta ?? 0;
+    lastGamma = e.gamma ?? 0;
+
+    const gx = ((e.gamma + 45) / 90) * 36 - 18;
+    const gy = (((e.beta - 45) + 45) / 90) * 36 - 18;
+    gyroDot.style.transform = `translate(calc(-50% + ${gx}px), calc(-50% + ${gy}px))`;
+  });
+
+  document.getElementById('grant-btn').addEventListener('click', async () => {
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      try {
+        const perm = await DeviceOrientationEvent.requestPermission();
+        if (perm === 'granted') {
+          sensorGranted = true;
+          permOverlay.style.display = 'none';
+          startGyroStream();
+          connect(hostInput.value || 'localhost');
+        }
+      } catch(e) {
+        alert('Sensor permission denied. Use touchpad mode instead.');
+        permOverlay.style.display = 'none';
+        connect(hostInput.value || 'localhost');
+      }
+    } else {
+      sensorGranted = true;
+      permOverlay.style.display = 'none';
+      startGyroStream();
+      connect(hostInput.value || 'localhost');
+    }
+  });
+
+  document.getElementById('btn-click').addEventListener('click', () => {
+    send({ type: 'click', data: null });
+    navigator.vibrate?.(40);
+  });
+
+  document.getElementById('btn-back').addEventListener('click', () => {
+    send({ type: 'scroll', data: { direction: -1 } });
+    navigator.vibrate?.(20);
+  });
+
+  document.getElementById('btn-scroll-up').addEventListener('click', () => {
+    send({ type: 'scroll', data: { direction: -1 } });
+  });
+
+  document.getElementById('btn-scroll-down').addEventListener('click', () => {
+    send({ type: 'scroll', data: { direction: 1 } });
+  });
+
+  document.getElementById('reconnect-btn').addEventListener('click', () => {
+    connect(hostInput.value || 'localhost');
+  });
+
+  document.getElementById('mode-gyro').addEventListener('click', () => {
+    mode = 'gyro';
+    document.getElementById('mode-gyro').classList.add('active');
+    document.getElementById('mode-touch').classList.remove('active');
+    modeLabel.textContent = 'GYROSCOPE MODE';
+    touchpad.removeEventListener('pointermove', onTouchpadMove);
+    if (sensorGranted) startGyroStream();
+  });
+
+  document.getElementById('mode-touch').addEventListener('click', () => {
+    mode = 'touch';
+    document.getElementById('mode-touch').classList.add('active');
+    document.getElementById('mode-gyro').classList.remove('active');
+    modeLabel.textContent = 'TOUCHPAD MODE';
+    stopGyroStream();
+    touchpad.addEventListener('pointermove', onTouchpadMove);
+  });
+
+  let lastTouchX = null, lastTouchY = null;
+
+  function onTouchpadMove(e) {
+    e.preventDefault();
+    touchpad.classList.add('active');
+    const rect = touchpad.getBoundingClientRect();
+
+    if (lastTouchX === null) {
+      lastTouchX = e.clientX;
+      lastTouchY = e.clientY;
+      return;
+    }
+
+    const dx = (e.clientX - lastTouchX) / rect.width;
+    const dy = (e.clientY - lastTouchY) / rect.height;
+
+    const screenW = 1920, screenH = 1080;
+
+    send({
+      type: 'imu',
+      data: {
+        alpha: 0,
+        beta: 45 + dy * screenH * 0.1,
+        gamma: -45 + (e.clientX - rect.left) / rect.width * 90,
+        timestamp: Date.now()
+      }
+    });
+
+    lastTouchX = e.clientX;
+    lastTouchY = e.clientY;
+  }
+
+  touchpad.addEventListener('pointerup', () => {
+    touchpad.classList.remove('active');
+    lastTouchX = null;
+    lastTouchY = null;
+  });
+
+  touchpad.addEventListener('pointerleave', () => {
+    lastTouchX = null;
+    lastTouchY = null;
+  });
+
+  touchpad.addEventListener('pointerdown', (e) => {
+    touchpad.setPointerCapture(e.pointerId);
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/schema.json",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devPath": "http://localhost:1420",
+    "distDir": "../dist",
+    "withGlobalTauri": true
+  },
+  "package": {
+    "productName": "Butu",
+    "version": "0.1.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "shell": { "all": false, "open": true },
+      "window": { "all": true },
+      "fs": { "all": true, "scope": ["$HOME/**", "$DOCUMENT/**", "$VIDEO/**", "$AUDIO/**"] },
+      "path": { "all": true },
+      "dialog": { "all": true },
+      "http": { "all": true, "scope": ["http://*", "https://*"] }
+    },
+    "bundle": {
+      "active": true,
+      "targets": "all",
+      "identifier": "com.butu.app",
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.icns",
+        "icons/icon.ico"
+      ]
+    },
+    "security": {
+      "csp": null
+    },
+    "windows": [
+      {
+        "fullscreen": false,
+        "resizable": true,
+        "title": "Butu",
+        "width": 1920,
+        "height": 1080,
+        "minWidth": 1280,
+        "minHeight": 720,
+        "decorations": false,
+        "transparent": false,
+        "theme": "Dark",
+        "center": true
+      }
+    ]
+  }
+}
