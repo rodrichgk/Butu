@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useButuStore } from "../store/useButuStore";
+import { usePlatformBridge } from "./usePlatformBridge";
 import type { SpatialMessage } from "../types";
 
 const WS_PORT = 9001;
@@ -10,6 +11,7 @@ export function useWebSocketBridge(
   onPhysicalClick: () => void
 ) {
   const setWsConnected = useButuStore((s) => s.setWsConnected);
+  const { isStandaloneTV, isTauri } = usePlatformBridge();
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const imuHistory = useRef<{ beta: number; gamma: number }[]>([]);
@@ -41,6 +43,10 @@ export function useWebSocketBridge(
   );
 
   const connect = useCallback(() => {
+    if (isStandaloneTV && !isTauri) {
+      console.warn("WebSocket Bridge disabled: Running in standalone WebOS/Tizen environment without local Rust backend.");
+      return;
+    }
     try {
       const ws = new WebSocket(`ws://localhost:${WS_PORT}`);
       wsRef.current = ws;

@@ -9,6 +9,7 @@ import { ContentDetailPage } from "./components/ContentDetailPage";
 import { JellyfinSetup } from "./components/JellyfinSetup";
 import { useSpatialCursor } from "./hooks/useSpatialCursor";
 import { useWebSocketBridge } from "./hooks/useWebSocketBridge";
+import { useSpatialNavigation } from "./hooks/useSpatialNavigation";
 import { useButuStore } from "./store/useButuStore";
 import { mockLibrary, heroSlides } from "./data/mockLibrary";
 import {
@@ -23,6 +24,7 @@ function useFilteredLibrary() {
   const activeSection  = useButuStore((s) => s.activeSection);
   const storeLibrary   = useButuStore((s) => s.library);
   const jellyfinConfig = useButuStore((s) => s.jellyfinConfig);
+  const watchProgress  = useButuStore((s) => s.watchProgress);
 
   const source = jellyfinConfig && storeLibrary.length > 0 ? storeLibrary : mockLibrary;
 
@@ -32,12 +34,21 @@ function useFilteredLibrary() {
   const anime  = source.filter((i) => i.type === "anime");
   const manga  = source.filter((i) => i.type === "manga");
 
-  if (activeSection === "movies") return { movies, music: [], tv: [], anime: [], manga: [], source };
-  if (activeSection === "music")  return { movies: [], music, tv: [], anime: [], manga: [], source };
-  if (activeSection === "tv")     return { movies: [], music: [], tv, anime: [], manga: [], source };
-  if (activeSection === "anime")  return { movies: [], music: [], tv: [], anime, manga: [], source };
-  if (activeSection === "manga")  return { movies: [], music: [], tv: [], anime: [], manga, source };
-  return { movies, music, tv, anime, manga, source };
+  const continueWatching = source.filter((i) => {
+    const prog = watchProgress[i.id];
+    if (prog && prog.time > 5) {
+      if (i.duration && prog.time > i.duration * 0.95) return false;
+      return true;
+    }
+    return false;
+  });
+
+  if (activeSection === "movies") return { movies, music: [], tv: [], anime: [], manga: [], source, continueWatching: [] };
+  if (activeSection === "music")  return { movies: [], music, tv: [], anime: [], manga: [], source, continueWatching: [] };
+  if (activeSection === "tv")     return { movies: [], music: [], tv, anime: [], manga: [], source, continueWatching: [] };
+  if (activeSection === "anime")  return { movies: [], music: [], tv: [], anime, manga: [], source, continueWatching: [] };
+  if (activeSection === "manga")  return { movies: [], music: [], tv: [], anime: [], manga, source, continueWatching: [] };
+  return { movies, music, tv, anime, manga, source, continueWatching };
 }
 
 export default function App() {
@@ -50,6 +61,8 @@ export default function App() {
   const setLibrary       = useButuStore((s) => s.setLibrary);
   const setJellyfinLoading = useButuStore((s) => s.setJellyfinLoading);
   const setJellyfinError   = useButuStore((s) => s.setJellyfinError);
+
+  useSpatialNavigation();
 
   useEffect(() => {
     if (!jellyfinConfig) return;
@@ -99,7 +112,7 @@ export default function App() {
 
   useWebSocketBridge(handleIMUCoords, handlePhysicalClick);
 
-  const { movies, music, tv, anime, manga, source } = useFilteredLibrary();
+  const { movies, music, tv, anime, manga, source, continueWatching } = useFilteredLibrary();
 
   const handleSelect = useCallback((item: MediaItem) => {
     setSelectedMedia(item);
@@ -156,6 +169,14 @@ export default function App() {
         >
           {activeSection === "home" && (
             <>
+              {continueWatching.length > 0 && (
+                <MediaStage
+                  title="Continue Watching"
+                  items={continueWatching}
+                  onSelect={handleSelect}
+                  metaLabel="RESUME PLAYBACK"
+                />
+              )}
               {movies.length > 0 && (
                 <MediaStage
                   title="Cinema"

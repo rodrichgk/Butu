@@ -238,7 +238,7 @@ export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
                 setPlayer({ currentMedia: current, isPlaying: true });
                 onSelect(current);
               }}
-              className="flex items-center gap-3 px-8 py-4 rounded-full font-display font-bold text-base"
+              className="focusable flex items-center gap-3 px-8 py-4 rounded-full font-display font-bold text-base focus:outline-none focus:ring-4 focus:ring-primary/40 focus:scale-[1.04]"
               style={{
                 background: "linear-gradient(135deg, #99f7ff 0%, #00f1fe 100%)",
                 color: "#001f24",
@@ -258,7 +258,7 @@ export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
             <motion.button
               data-magnetic
               data-magnetic-id={`hero-info-${current.id}`}
-              className="flex items-center gap-3 px-8 py-4 rounded-full font-display font-bold text-base"
+              className="focusable flex items-center gap-3 px-8 py-4 rounded-full font-display font-bold text-base focus:outline-none focus:ring-4 focus:ring-white/20 focus:scale-[1.04]"
               style={{
                 background: "rgba(224,230,240,0.11)",
                 color: "#e0e6f0",

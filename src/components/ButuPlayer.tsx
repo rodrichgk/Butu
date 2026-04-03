@@ -109,15 +109,18 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
         setBuffered(vid.buffered.end(vid.buffered.length - 1));
       }
     };
-    const onLoaded = () => {
+    const onCanPlay = () => {
       if (initialTime && initialTime > 0) {
-        vid.currentTime = initialTime;
+        // Only seek once
+        if (vid.currentTime < initialTime - 2 || vid.currentTime > initialTime + 2) {
+          vid.currentTime = initialTime;
+        }
       }
     };
 
     vid.addEventListener("timeupdate", onTimeUpdate);
     vid.addEventListener("loadedmetadata", onDuration);
-    vid.addEventListener("loadedmetadata", onLoaded);
+    vid.addEventListener("canplay", onCanPlay);
     vid.addEventListener("play", onPlay);
     vid.addEventListener("pause", onPause);
     vid.addEventListener("progress", onProgress);
@@ -125,7 +128,7 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
     return () => {
       vid.removeEventListener("timeupdate", onTimeUpdate);
       vid.removeEventListener("loadedmetadata", onDuration);
-      vid.removeEventListener("loadedmetadata", onLoaded);
+      vid.removeEventListener("canplay", onCanPlay);
       vid.removeEventListener("play", onPlay);
       vid.removeEventListener("pause", onPause);
       vid.removeEventListener("progress", onProgress);

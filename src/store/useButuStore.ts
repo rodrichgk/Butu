@@ -4,10 +4,38 @@ import type { MediaItem, PlayerState, CursorState, JellyfinConfig } from "../typ
 const LS_JELLYFIN_KEY = "butu:jellyfin";
 function loadJellyfinConfig(): JellyfinConfig | null {
   try {
+    // @ts-ignore
+    const envUrl = import.meta.env.VITE_JELLYFIN_SERVER_URL;
+    // @ts-ignore
+    const envUser = import.meta.env.VITE_JELLYFIN_USER_NAME;
+    // @ts-ignore
+    const envUserId = import.meta.env.VITE_JELLYFIN_USER_ID;
+    // @ts-ignore
+    const envToken = import.meta.env.VITE_JELLYFIN_TOKEN;
+
+    if (envUrl && envUser && envUserId && envToken) {
+      return {
+        serverUrl: envUrl,
+        userName: envUser,
+        userId: envUserId,
+        token: envToken,
+      };
+    }
+
     const raw = localStorage.getItem(LS_JELLYFIN_KEY);
     return raw ? (JSON.parse(raw) as JellyfinConfig) : null;
   } catch {
     return null;
+  }
+}
+
+const LS_PROGRESS_KEY = "butu:progress";
+function loadWatchProgress(): Record<string, { time: number; season?: number; episode?: number }> {
+  try {
+    const raw = localStorage.getItem(LS_PROGRESS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
   }
 }
 
@@ -86,9 +114,13 @@ export const useButuStore = create<ButuStore>((set) => ({
   library: [],
   setLibrary: (items) => set({ library: items }),
 
-  watchProgress: {},
+  watchProgress: loadWatchProgress(),
   setWatchProgress: (id, data) =>
-    set((s) => ({ watchProgress: { ...s.watchProgress, [id]: data } })),
+    set((s) => {
+      const newProgress = { ...s.watchProgress, [id]: data };
+      localStorage.setItem(LS_PROGRESS_KEY, JSON.stringify(newProgress));
+      return { watchProgress: newProgress };
+    }),
 
   jellyfinConfig: loadJellyfinConfig(),
   setJellyfinConfig: (cfg) => {

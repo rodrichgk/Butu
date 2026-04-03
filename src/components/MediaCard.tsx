@@ -58,21 +58,31 @@ function CodecBadge({ codec }: { codec: string }) {
 
 export function MediaCard({ item, size = "standard", onSelect }: MediaCardProps) {
   const [hovered, setHovered] = useState(false);
+  const [nativeFocused, setNativeFocused] = useState(false);
   const focusedCardId = useButuStore((s) => s.focusedCardId);
   const isMagneticFocused = focusedCardId === item.id;
-  const isFocused = hovered || isMagneticFocused;
+  const isFocused = hovered || isMagneticFocused || nativeFocused;
 
   const cardClass = getCardClass(item.type);
   const widthClass = getCardWidth(item.type);
 
   return (
     <motion.div
-      className={`relative flex-shrink-0 ${widthClass} ${cardClass} group`}
+      className={`relative flex-shrink-0 ${widthClass} ${cardClass} group focus:outline-none focusable`}
       data-magnetic
       data-magnetic-id={item.id}
+      tabIndex={0}
       onHoverStart={() => setHovered(true)}
       onHoverEnd={() => setHovered(false)}
+      onFocus={() => setNativeFocused(true)}
+      onBlur={() => setNativeFocused(false)}
       onClick={() => onSelect(item)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          onSelect(item);
+        }
+      }}
       animate={{
         scale: isFocused ? 1.02 : 1,
       }}

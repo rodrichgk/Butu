@@ -220,11 +220,20 @@ export function NavigationSidebar() {
           return (
             <motion.button
               key={item.id}
+              className="focusable focus:outline-none"
               data-magnetic
               data-magnetic-id={`nav-${item.id}`}
               onClick={() => setActiveSection(item.id)}
               onHoverStart={() => setHoveredId(item.id)}
               onHoverEnd={() => setHoveredId(null)}
+              onFocus={() => { setHoveredId(item.id); setExpanded(true); }}
+              onBlur={() => { setHoveredId(null); setExpanded(false); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  setActiveSection(item.id);
+                }
+              }}
               whileTap={{ scale: 0.95 }}
               style={{
                 position: "relative",

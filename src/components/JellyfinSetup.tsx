@@ -115,7 +115,7 @@ export function JellyfinSetup() {
                   onChange={(e) => setServerUrl(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleConnect()}
                   placeholder="http://192.168.1.100:8096"
-                  className="w-full rounded-xl px-4 py-3.5 font-mono-tech text-sm mb-4 outline-none"
+                  className="focusable w-full rounded-xl px-4 py-3.5 font-mono-tech text-sm mb-4 outline-none focus:ring-4 focus:ring-primary/40"
                   style={{
                     background: "rgba(22,26,38,0.8)",
                     color: "#e0e6f0",
@@ -152,7 +152,7 @@ export function JellyfinSetup() {
               >
                 <button
                   onClick={() => { setStep("server"); setError(null); }}
-                  className="flex items-center gap-1.5 font-body text-sm mb-5"
+                  className="focusable flex items-center gap-1.5 font-body text-sm mb-5 focus:outline-none focus:text-white"
                   style={{ color: "rgba(224,230,240,0.45)", cursor: "none" }}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -174,7 +174,7 @@ export function JellyfinSetup() {
                   onChange={(e) => setUsername(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                   placeholder="Username"
-                  className="w-full rounded-xl px-4 py-3.5 font-mono-tech text-sm mb-3 outline-none"
+                  className="focusable w-full rounded-xl px-4 py-3.5 font-mono-tech text-sm mb-3 outline-none focus:ring-4 focus:ring-primary/40"
                   style={{
                     background: "rgba(22,26,38,0.8)",
                     color: "#e0e6f0",
@@ -190,7 +190,7 @@ export function JellyfinSetup() {
                   onChange={(e) => setPassword(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                   placeholder="Password"
-                  className="w-full rounded-xl px-4 py-3.5 font-mono-tech text-sm mb-5 outline-none"
+                  className="focusable w-full rounded-xl px-4 py-3.5 font-mono-tech text-sm mb-5 outline-none focus:ring-4 focus:ring-primary/40"
                   style={{
                     background: "rgba(22,26,38,0.8)",
                     color: "#e0e6f0",
