@@ -7,6 +7,7 @@ import { MediaStage } from "./components/MediaStage";
 import { ButuPlayer } from "./components/ButuPlayer";
 import { ContentDetailPage } from "./components/ContentDetailPage";
 import { MediaSetup } from "./components/MediaSetup";
+import { Landing } from "./components/Landing";
 import { SplashScreen } from "./components/SplashScreen";
 import { MarkerAutoDetectModal } from "./components/MarkerAutoDetectModal";
 import { QRCodeSVG } from "qrcode.react";
@@ -253,6 +254,10 @@ export default function App() {
   const jellyfinConfig   = useButuStore((s) => s.jellyfinConfig);
   const plexConfig       = useButuStore((s) => s.plexConfig);
   const setLibrary       = useButuStore((s) => s.setLibrary);
+  // Landing → setup gate. Show the explainer first; once connected (or on a later disconnect)
+  // it resets so a signed-out visitor always lands on the explainer, not straight on the form.
+  const [showSetup, setShowSetup] = useState(false);
+  useEffect(() => { if (serverType) setShowSetup(false); }, [serverType]);
   const setJellyfinLoading = useButuStore((s) => s.setJellyfinLoading);
   const setJellyfinError   = useButuStore((s) => s.setJellyfinError);
 
@@ -432,9 +437,11 @@ export default function App() {
   );
 
   if (!serverType || (serverType === "jellyfin" && !jellyfinConfig) || (serverType === "plex" && !plexConfig)) {
-    // Setup is a form screen — it uses the real OS cursor (see .media-setup in index.css),
-    // so no liquid cursor here (it depends on the magnetic-snap system setup doesn't wire up).
-    return <MediaSetup />;
+    // First-time / signed-out visitors get the explainer landing; "Connect" opens the
+    // Plex/Jellyfin login. Once a server is connected the app goes straight to the content.
+    // Both are form/marketing screens — they use the real OS cursor (see index.css), so no
+    // liquid cursor here (it depends on the magnetic-snap system these screens don't wire up).
+    return showSetup ? <MediaSetup /> : <Landing onGetStarted={() => setShowSetup(true)} />;
   }
 
   return (

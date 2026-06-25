@@ -147,10 +147,15 @@
    (which depends on the magnetic-snap system that the setup screen doesn't wire up).
    !important overrides the global `cursor: none` and any inline styles on the controls. */
 .media-setup,
-.media-setup * { cursor: auto !important; }
+.media-setup *,
+.landing,
+.landing * { cursor: auto !important; }
 .media-setup a,
 .media-setup button,
-.media-setup [role="button"] { cursor: pointer !important; }
+.media-setup [role="button"],
+.landing a,
+.landing button,
+.landing [role="button"] { cursor: pointer !important; }
 .media-setup input,
 .media-setup textarea { cursor: text !important; }
 
