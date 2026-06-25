@@ -1,41 +1,98 @@
 import { create } from "zustand";
-import type { MediaItem, PlayerState, CursorState, JellyfinConfig } from "../types";
+import type { MediaItem, PlayerState, CursorState, JellyfinConfig, PlexConfig, ServerType, WatchProgressEntry } from "../types";
 
 const LS_JELLYFIN_KEY = "butu:jellyfin";
+
 function loadJellyfinConfig(): JellyfinConfig | null {
   try {
     // @ts-ignore
-    const envUrl = import.meta.env.VITE_JELLYFIN_SERVER_URL;
+    const envUrl    = import.meta.env.VITE_JELLYFIN_SERVER_URL;
     // @ts-ignore
-    const envUser = import.meta.env.VITE_JELLYFIN_USER_NAME;
+    const envUser   = import.meta.env.VITE_JELLYFIN_USER_NAME;
     // @ts-ignore
     const envUserId = import.meta.env.VITE_JELLYFIN_USER_ID;
     // @ts-ignore
-    const envToken = import.meta.env.VITE_JELLYFIN_TOKEN;
-
-    if (envUrl && envUser && envUserId && envToken) {
-      return {
-        serverUrl: envUrl,
-        userName: envUser,
-        userId: envUserId,
-        token: envToken,
-      };
+    const envToken  = import.meta.env.VITE_JELLYFIN_TOKEN;
+    // Dev-only auto-login. Never in a production/web build — otherwise every visitor would be
+    // signed into the dev's server and the token would ship in the bundle.
+    // @ts-ignore
+    if (import.meta.env.DEV && envUrl && envUser && envUserId && envToken) {
+      return { serverUrl: envUrl, userName: envUser, userId: envUserId, token: envToken };
     }
-
     const raw = localStorage.getItem(LS_JELLYFIN_KEY);
     return raw ? (JSON.parse(raw) as JellyfinConfig) : null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
+const LS_PLEX_KEY = "butu:plex";
+function loadPlexConfig(): PlexConfig | null {
+  try {
+    // @ts-ignore
+    const envUrl   = import.meta.env.VITE_PLEX_SERVER_URL;
+    // @ts-ignore
+    const envToken = import.meta.env.VITE_PLEX_TOKEN;
+    // @ts-ignore
+    const envUser  = import.meta.env.VITE_PLEX_USER_NAME;
+    // Dev-only auto-login (see loadJellyfinConfig).
+    // @ts-ignore
+    if (import.meta.env.DEV && envUrl && envToken) {
+      return { serverUrl: envUrl, token: envToken, userName: envUser };
+    }
+    const raw = localStorage.getItem(LS_PLEX_KEY);
+    return raw ? (JSON.parse(raw) as PlexConfig) : null;
+  } catch { return null; }
+}
+
+const LS_SERVER_TYPE_KEY = "butu:serverType";
+const loadServerType = (): "jellyfin" | "plex" | null => {
+  // Dev-only: prioritize .env config over the saved choice. Skipped in production/web builds.
+  // @ts-ignore
+  if (import.meta.env.DEV && import.meta.env.VITE_PLEX_SERVER_URL && import.meta.env.VITE_PLEX_TOKEN) return "plex";
+  // @ts-ignore
+  if (import.meta.env.DEV && import.meta.env.VITE_JELLYFIN_SERVER_URL) return "jellyfin";
+  
+  const saved = localStorage.getItem(LS_SERVER_TYPE_KEY) as "jellyfin" | "plex" | null;
+  if (saved) return saved;
+
+  return null;
+};
+
 const LS_PROGRESS_KEY = "butu:progress";
-function loadWatchProgress(): Record<string, { time: number; season?: number; episode?: number }> {
+function loadWatchProgress(): Record<string, WatchProgressEntry> {
   try {
     const raw = localStorage.getItem(LS_PROGRESS_KEY);
     return raw ? JSON.parse(raw) : {};
   } catch {
     return {};
+  }
+}
+
+export interface AppSettings {
+  autoSkipIntro: boolean;
+  autoSkipCredits: boolean;
+  autoPlayNext: boolean;
+  showHero: boolean;
+  showContinueWatching: boolean;
+  /** Downmix surround to stereo and lift the dialogue (centre) channel. */
+  boostVoices: boolean;
+}
+
+const DEFAULT_SETTINGS: AppSettings = {
+  autoSkipIntro: false,
+  autoSkipCredits: false,
+  autoPlayNext: true,
+  showHero: true,
+  showContinueWatching: true,
+  boostVoices: true,
+};
+
+const LS_SETTINGS_KEY = "butu:settings";
+function loadSettings(): AppSettings {
+  try {
+    const raw = localStorage.getItem(LS_SETTINGS_KEY);
+    return raw ? { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } : DEFAULT_SETTINGS;
+  } catch {
+    return DEFAULT_SETTINGS;
   }
 }
 
@@ -61,11 +118,25 @@ interface ButuStore {
   library: MediaItem[];
   setLibrary: (items: MediaItem[]) => void;
 
-  watchProgress: Record<string, { time: number; season?: number; episode?: number }>;
-  setWatchProgress: (id: string, data: { time: number; season?: number; episode?: number }) => void;
+  watchProgress: Record<string, WatchProgressEntry>;
+  setWatchProgress: (id: string, data: WatchProgressEntry) => void;
+  clearWatchProgress: () => void;
+
+  settings: AppSettings;
+  updateSettings: (partial: Partial<AppSettings>) => void;
+
+  /** Bumping this re-triggers the library load effect (used by "Reload library"). */
+  libraryRefreshKey: number;
+  refreshLibrary: () => void;
 
   jellyfinConfig: JellyfinConfig | null;
   setJellyfinConfig: (cfg: JellyfinConfig | null) => void;
+
+  plexConfig: PlexConfig | null;
+  setPlexConfig: (cfg: PlexConfig | null) => void;
+
+  serverType: ServerType | null;
+  setServerType: (type: ServerType | null) => void;
 
   jellyfinLoading: boolean;
   setJellyfinLoading: (val: boolean) => void;
@@ -121,12 +192,41 @@ export const useButuStore = create<ButuStore>((set) => ({
       localStorage.setItem(LS_PROGRESS_KEY, JSON.stringify(newProgress));
       return { watchProgress: newProgress };
     }),
+  clearWatchProgress: () => {
+    localStorage.removeItem(LS_PROGRESS_KEY);
+    set({ watchProgress: {} });
+  },
+
+  settings: loadSettings(),
+  updateSettings: (partial) =>
+    set((s) => {
+      const next = { ...s.settings, ...partial };
+      localStorage.setItem(LS_SETTINGS_KEY, JSON.stringify(next));
+      return { settings: next };
+    }),
+
+  libraryRefreshKey: 0,
+  refreshLibrary: () => set((s) => ({ libraryRefreshKey: s.libraryRefreshKey + 1 })),
 
   jellyfinConfig: loadJellyfinConfig(),
   setJellyfinConfig: (cfg) => {
     if (cfg) localStorage.setItem(LS_JELLYFIN_KEY, JSON.stringify(cfg));
     else localStorage.removeItem(LS_JELLYFIN_KEY);
     set({ jellyfinConfig: cfg });
+  },
+
+  plexConfig: loadPlexConfig(),
+  setPlexConfig: (cfg) => {
+    if (cfg) localStorage.setItem(LS_PLEX_KEY, JSON.stringify(cfg));
+    else localStorage.removeItem(LS_PLEX_KEY);
+    set({ plexConfig: cfg });
+  },
+
+  serverType: loadServerType(),
+  setServerType: (type) => {
+    if (type) localStorage.setItem(LS_SERVER_TYPE_KEY, type);
+    else localStorage.removeItem(LS_SERVER_TYPE_KEY);
+    set({ serverType: type });
   },
 
   jellyfinLoading: false,

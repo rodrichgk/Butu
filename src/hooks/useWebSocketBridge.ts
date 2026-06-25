@@ -48,7 +48,7 @@ export function useWebSocketBridge(
       return;
     }
     try {
-      const ws = new WebSocket(`ws://localhost:${WS_PORT}`);
+      const ws = new WebSocket(`ws://127.0.0.1:${WS_PORT}`);
       wsRef.current = ws;
 
       ws.onopen = () => {

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Butu</string>
+    <string name="air_mouse_channel_name">Air Mouse</string>
+    <string name="air_mouse_notification_title">Butu Air Mouse</string>
+    <string name="air_mouse_notification_text">Listening for phone controller input on port 9001</string>
+    <string name="com_google_android_gms_fonts_provider_authority">com.google.android.gms.fonts</string>
+    <string name="com_google_android_gms_fonts_provider_package">com.google.android.gms</string>
+</resources>

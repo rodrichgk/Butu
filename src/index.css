@@ -38,16 +38,12 @@
 
 @layer components {
   .glass {
-    background: rgba(58, 64, 80, 0.6);
-    backdrop-filter: blur(40px);
-    -webkit-backdrop-filter: blur(40px);
+    background: rgba(42, 48, 62, 0.92);
     border: 1px solid rgba(46, 52, 71, 0.2);
   }
 
   .glass-sm {
-    background: rgba(22, 26, 38, 0.75);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    background: rgba(18, 22, 32, 0.94);
     border: 1px solid rgba(74, 82, 104, 0.15);
   }
 
@@ -112,7 +108,6 @@
 
   .seek-bar-glass {
     background: rgba(153, 247, 255, 0.08);
-    backdrop-filter: blur(20px);
     border: 1px solid rgba(153, 247, 255, 0.12);
     border-radius: 9999px;
   }
@@ -142,24 +137,54 @@
   position: fixed;
   pointer-events: none;
   z-index: 9999;
-  mix-blend-mode: screen;
   will-change: transform;
   transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1),
               height 0.2s cubic-bezier(0.16, 1, 0.3, 1),
               opacity 0.2s ease;
 }
 
+/* Setup/login is a form screen — use the real OS cursor, not the TV-style liquid cursor
+   (which depends on the magnetic-snap system that the setup screen doesn't wire up).
+   !important overrides the global `cursor: none` and any inline styles on the controls. */
+.media-setup,
+.media-setup * { cursor: auto !important; }
+.media-setup a,
+.media-setup button,
+.media-setup [role="button"] { cursor: pointer !important; }
+.media-setup input,
+.media-setup textarea { cursor: text !important; }
+
 /* TV/fullscreen focus ring suppression */
 *:focus {
   outline: none;
 }
 
+/* Sidebar nav: rectangular halo doesn't fit a 30px round icon — suppress the
+   global ring; the existing onFocus → setHoveredId already lights up the
+   circular backdrop, which IS the focus indicator. */
+.nav-sidebar-item:focus,
+button.nav-sidebar-item:focus,
+.nav-sidebar-item.focusable:focus {
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+/* Player seek bar: thin horizontal bar — replace the wide global halo with a
+   tight glow that hugs the bar so it reads as the focused timeline without
+   distorting the circular scrubber thumb. */
+.player-seek-bar:focus,
+.player-seek-bar.focusable:focus {
+  box-shadow:
+    0 0 0 1px rgba(153, 247, 255, 0.55),
+    0 0 22px 6px rgba(153, 247, 255, 0.32) !important;
+  transform: none !important;
+}
+
 /* Smooth scrolling for media stages */
 .media-stage-scroll {
   scroll-behavior: smooth;
-  scroll-snap-type: x mandatory;
 }
 
 .media-stage-item {
-  scroll-snap-align: start;
+  /* scroll-snap removed: causes forced layout recalc on every scroll frame */
 }

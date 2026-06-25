@@ -1,132 +1,146 @@
 import { useEffect } from 'react';
+import { tvFocusManager } from '../utils/tvFocusManager';
 
-/**
- * A basic hook to enable directional D-Pad navigation for Smart TVs.
- * Focuses elements with the class 'focusable' or standard interactive elements.
- */
 export function useSpatialNavigation() {
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Map common D-pad keys
-      let direction = null;
+    const onKey = (e: KeyboardEvent) => {
+      const active = document.activeElement as HTMLElement | null;
+
+      // Let inputs handle left/right themselves
+      if (
+        (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) &&
+        (e.key === 'ArrowLeft' || e.key === 'ArrowRight')
+      ) return;
+
+      // Check if user is in a scrollable area - don't intercept if they can scroll
+      // Uses classList checks instead of getComputedStyle to avoid layout thrashing
+      const isInScrollable = (element: HTMLElement | null): boolean => {
+        if (!element || element === document.body) return false;
+        
+        const isScrollable = 
+          element.classList.contains('overflow-x-auto') ||
+          element.classList.contains('overflow-y-auto') ||
+          element.classList.contains('media-stage-scroll');
+        
+        if (isScrollable) {
+          const hasVerticalScroll = element.scrollHeight > element.clientHeight;
+          const hasHorizontalScroll = element.scrollWidth > element.clientWidth;
+          
+          if (e.key === 'ArrowDown' || e.key === 'Down') {
+            if (hasVerticalScroll && element.scrollTop < element.scrollHeight - element.clientHeight - 5) {
+              return true;
+            }
+          }
+          if (e.key === 'ArrowUp' || e.key === 'Up') {
+            if (hasVerticalScroll && element.scrollTop > 5) {
+              return true;
+            }
+          }
+          if (e.key === 'ArrowRight' || e.key === 'Right') {
+            if (hasHorizontalScroll && element.scrollLeft < element.scrollWidth - element.clientWidth - 5) {
+              return true;
+            }
+          }
+          if (e.key === 'ArrowLeft' || e.key === 'Left') {
+            if (hasHorizontalScroll && element.scrollLeft > 5) {
+              return true;
+            }
+          }
+        }
+        
+        return isInScrollable(element.parentElement);
+      };
+
+      // Don't intercept if we're in a scrollable area that can still scroll
+      if (isInScrollable(active)) {
+        return;
+      }
+
+      let handled = false;
+
       switch (e.key) {
         case 'ArrowUp':
         case 'Up':
-          direction = 'up';
+          e.preventDefault();
+          tvFocusManager.focusDirection('up');
+          handled = true;
           break;
+
         case 'ArrowDown':
         case 'Down':
-          direction = 'down';
+          e.preventDefault();
+          tvFocusManager.focusDirection('down');
+          handled = true;
           break;
+
         case 'ArrowLeft':
         case 'Left':
-          direction = 'left';
+          e.preventDefault();
+          tvFocusManager.focusDirection('left');
+          handled = true;
           break;
+
         case 'ArrowRight':
         case 'Right':
-          direction = 'right';
+          e.preventDefault();
+          tvFocusManager.focusDirection('right');
+          handled = true;
           break;
+
         case 'Enter':
-          // Native click will usually handle this, but can be forced
+          if (active && active !== document.body) {
+            // Buttons and links already activate on Enter via the browser's
+            // default action. Calling .click() here would double-fire and
+            // toggle pause→play in the same tick, making pause feel broken.
+            const tag = active.tagName;
+            if (tag === 'BUTTON' || tag === 'A') {
+              return;
+            }
+            // Sliders (e.g. the player seek bar) shouldn't activate on Enter
+            // — a programmatic .click() with clientX=0 would seek to start.
+            if (active.getAttribute('role') === 'slider') {
+              return;
+            }
+            e.preventDefault();
+            active.click();
+            handled = true;
+          }
           break;
-        case 'Escape':
+
         case 'Backspace':
-          // Handle back action (usually TV remote 'Back' button)
-          const active = document.activeElement as HTMLElement;
+        case 'Escape':
           if (
             e.key === 'Backspace' &&
             (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement)
-          ) {
-            return; // Let native text deletion overrule back-navigation
-          }
-          if (active && active !== document.body) {
-            active.blur();
+          ) return;
+          e.preventDefault();
+          window.history.back();
+          handled = true;
+          break;
+
+        case 'Tab':
+          e.preventDefault();
+          if (e.shiftKey) {
+            tvFocusManager.focusPrevious();
           } else {
-             window.history.back();
+            tvFocusManager.focusNext();
           }
+          handled = true;
           break;
       }
 
-      if (!direction) return;
-
-      e.preventDefault();
-
-      const focusableElements = Array.from(
-        document.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"]), .focusable'
-        )
-      ).filter(el => {
-        const rect = el.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0 && 
-               el.style.visibility !== 'hidden' && 
-               el.style.display !== 'none';
-      });
-
-      const activeEl = document.activeElement as HTMLElement;
-
-      // Allow native text cursor movement inside inputs/textareas
-      if (
-        (activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement) &&
-        (direction === 'left' || direction === 'right')
-      ) {
-        return;
-      }
-      
-      if (!focusableElements.includes(activeEl)) {
-        // If nothing is focused, focus the first element
-        focusableElements[0]?.focus();
-        return;
-      }
-
-      // Basic nearest-neighbor logic
-      const activeRect = activeEl.getBoundingClientRect();
-      const activeCenter = {
-        x: activeRect.left + activeRect.width / 2,
-        y: activeRect.top + activeRect.height / 2
-      };
-
-      let bestCandidate: HTMLElement | null = null;
-      let minDistance = Infinity;
-
-      for (const el of focusableElements) {
-        if (el === activeEl) continue;
-
-        const rect = el.getBoundingClientRect();
-        const center = {
-          x: rect.left + rect.width / 2,
-          y: rect.top + rect.height / 2
-        };
-
-        let isValidCandidate = false;
-
-        if (direction === 'up' && center.y < activeCenter.y - 10) isValidCandidate = true;
-        if (direction === 'down' && center.y > activeCenter.y + 10) isValidCandidate = true;
-        if (direction === 'left' && center.x < activeCenter.x - 10) isValidCandidate = true;
-        if (direction === 'right' && center.x > activeCenter.x + 10) isValidCandidate = true;
-
-        if (isValidCandidate) {
-          const dist = Math.hypot(center.x - activeCenter.x, center.y - activeCenter.y);
-          // Prioritize alignment in the perpendicular axis
-          const alignmentPenalty = 
-            (direction === 'up' || direction === 'down') 
-              ? Math.abs(center.x - activeCenter.x) * 2 
-              : Math.abs(center.y - activeCenter.y) * 2;
-          
-          const totalDistance = dist + alignmentPenalty;
-
-          if (totalDistance < minDistance) {
-            minDistance = totalDistance;
-            bestCandidate = el;
-          }
-        }
-      }
-
-      if (bestCandidate) {
-        bestCandidate.focus();
-      }
+      // Navigation feedback is handled by the debounced MutationObserver
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', onKey);
+    
+    // Initialize focus on first element
+    setTimeout(() => {
+      tvFocusManager.focusFirst();
+    }, 500);
+
+    return () => {
+      window.removeEventListener('keydown', onKey);
+    };
   }, []);
 }

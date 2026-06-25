@@ -1,0 +1,12 @@
+{
+  "name": "Butu",
+  "short_name": "Butu",
+  "description": "Cinema · Television · Sound",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#04060d",
+  "theme_color": "#04060d",
+  "icons": [
+    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" }
+  ]
+}

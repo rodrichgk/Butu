@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { LiquidCursor } from "./components/LiquidCursor";
 import { NavigationSidebar } from "./components/NavigationSidebar";
@@ -6,157 +6,452 @@ import { HeroCarousel } from "./components/HeroCarousel";
 import { MediaStage } from "./components/MediaStage";
 import { ButuPlayer } from "./components/ButuPlayer";
 import { ContentDetailPage } from "./components/ContentDetailPage";
-import { JellyfinSetup } from "./components/JellyfinSetup";
+import { MediaSetup } from "./components/MediaSetup";
+import { SplashScreen } from "./components/SplashScreen";
+import { MarkerAutoDetectModal } from "./components/MarkerAutoDetectModal";
+import { QRCodeSVG } from "qrcode.react";
 import { useSpatialCursor } from "./hooks/useSpatialCursor";
-import { useWebSocketBridge } from "./hooks/useWebSocketBridge";
 import { useSpatialNavigation } from "./hooks/useSpatialNavigation";
+import { useTouchpadScroll } from "./hooks/useTouchpadScroll";
 import { useButuStore } from "./store/useButuStore";
-import { mockLibrary, heroSlides } from "./data/mockLibrary";
 import {
-  fetchLibrary,
-  fetchEpisodes,
+  fetchJellyfinLibrary,
+  fetchJellyfinEpisodes,
   rawToMediaItem,
   rawToEpisode,
 } from "./services/jellyfinApi";
-import type { MediaItem } from "./types";
+import { 
+  fetchPlexSections, 
+  fetchPlexSection, 
+  fetchPlexEpisodes,
+  plexRawToMediaItem,
+  plexRawToEpisode
+} from "./services/plexApi";
+import type { MediaItem, WatchProgressEntry } from "./types";
+import { isAndroid } from "./utils/platform";
+import { preloader } from "./utils/predictivePreloader";
+import { swManager } from "./utils/serviceWorkerManager";
+import { metadataCache } from "./utils/metadataCache";
+import { resourcePrioritizer } from "./utils/resourcePrioritizer";
+
+/**
+ * Rewrites the audio params on a Plex universal-transcode URL according to the
+ * "Boost voices" setting. When on, the server downmixes surround to stereo and lifts
+ * the centre (dialogue) channel — otherwise dialogue gets buried under effects when the
+ * device folds 5.1 down to TV speakers. No-op for non-Plex/direct URLs.
+ */
+function rewriteAudioParams(url: string | undefined, boostVoices: boolean): string | undefined {
+  if (!url || !url.includes("/transcode/universal/")) return url;
+  try {
+    const u = new URL(url);
+    if (boostVoices) {
+      u.searchParams.set("audioChannels", "2");
+      u.searchParams.set("audioBoost", "200");
+    } else {
+      u.searchParams.delete("audioChannels");
+      u.searchParams.set("audioBoost", "100");
+    }
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
+function applyAudioPrefs(item: MediaItem, boostVoices: boolean): MediaItem {
+  const streamUrl = rewriteAudioParams(item.streamUrl, boostVoices);
+  const url = rewriteAudioParams(item.url, boostVoices);
+  if (streamUrl === item.streamUrl && url === item.url) return item;
+  return { ...item, streamUrl, url };
+}
+
+// TODO: replace with your real donation link (Ko-fi / Buy Me a Coffee / GitHub Sponsors / PayPal).
+// While it's still the placeholder the Support section auto-hides, so we can ship before the
+// donation link exists; setting a real URL makes it (and the QR) appear everywhere.
+const DONATE_URL = "https://example.com/donate";
+const DONATE_ENABLED = !DONATE_URL.includes("example.com");
+
+function openExternal(url: string) {
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+function DonateModal({ onClose }: { onClose: () => void }) {
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(4,6,13,0.8)", backdropFilter: "blur(8px)" }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="rounded-3xl p-8 flex flex-col items-center"
+        style={{ background: "rgba(16,20,30,0.98)", border: "1px solid rgba(153,247,255,0.15)", maxWidth: 360 }}
+        initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 10 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="font-display font-bold text-on_surface text-xl mb-1">Support Butu</h2>
+        <p className="font-body text-on_surface_variant text-sm text-center mb-5">
+          Butu is free. Scan with your phone — or open the page — to support development ❤
+        </p>
+        <div className="p-3 rounded-2xl" style={{ background: "#fff" }}>
+          <QRCodeSVG value={DONATE_URL} size={200} bgColor="#ffffff" fgColor="#04060d" />
+        </div>
+        <motion.button
+          onClick={() => openExternal(DONATE_URL)}
+          className="mt-5 px-5 py-2.5 rounded-xl font-body text-sm font-semibold"
+          style={{ background: "rgba(153,247,255,0.12)", color: "#99f7ff", border: "1px solid rgba(153,247,255,0.3)", cursor: "none" }}
+          whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+        >
+          Open donation page
+        </motion.button>
+        <button onClick={onClose} className="mt-3 font-body text-sm" style={{ color: "rgba(224,230,240,0.5)", cursor: "none" }}>
+          Close
+        </button>
+      </motion.div>
+    </motion.div>
+  );
+}
 
 function useFilteredLibrary() {
   const activeSection  = useButuStore((s) => s.activeSection);
   const storeLibrary   = useButuStore((s) => s.library);
   const jellyfinConfig = useButuStore((s) => s.jellyfinConfig);
+  const plexConfig     = useButuStore((s) => s.plexConfig);
   const watchProgress  = useButuStore((s) => s.watchProgress);
 
-  const source = jellyfinConfig && storeLibrary.length > 0 ? storeLibrary : mockLibrary;
+  return useMemo(() => {
+    const source = storeLibrary;
 
-  const movies = source.filter((i) => i.type === "movie");
-  const music  = source.filter((i) => i.type === "music");
-  const tv     = source.filter((i) => i.type === "tv");
-  const anime  = source.filter((i) => i.type === "anime");
-  const manga  = source.filter((i) => i.type === "manga");
+    const movies = source.filter((i) => i.type === "movie");
+    const music  = source.filter((i) => i.type === "music");
+    const tv     = source.filter((i) => i.type === "tv");
+    const anime  = source.filter((i) => i.type === "anime");
+    const manga  = source.filter((i) => i.type === "manga");
 
-  const continueWatching = source.filter((i) => {
-    const prog = watchProgress[i.id];
-    if (prog && prog.time > 5) {
-      if (i.duration && prog.time > i.duration * 0.95) return false;
+    // In progress = past the opening seconds but not effectively finished.
+    const inProgress = (p: WatchProgressEntry | undefined, fallbackDur?: number) => {
+      if (!p || p.time <= 5) return false;
+      const dur = p.duration ?? fallbackDur;
+      if (dur && p.time > dur * 0.95) return false;
       return true;
-    }
-    return false;
-  });
+    };
+    const continueWatching = source.filter((i) => {
+      // Movies/direct titles carry their own progress entry…
+      if (inProgress(watchProgress[i.id], i.duration)) return true;
+      // …shows don't: their progress lives on episode entries tagged with seriesId.
+      return Object.values(watchProgress).some(
+        (p) => p.seriesId === i.id && inProgress(p)
+      );
+    });
 
-  if (activeSection === "movies") return { movies, music: [], tv: [], anime: [], manga: [], source, continueWatching: [] };
-  if (activeSection === "music")  return { movies: [], music, tv: [], anime: [], manga: [], source, continueWatching: [] };
-  if (activeSection === "tv")     return { movies: [], music: [], tv, anime: [], manga: [], source, continueWatching: [] };
-  if (activeSection === "anime")  return { movies: [], music: [], tv: [], anime, manga: [], source, continueWatching: [] };
-  if (activeSection === "manga")  return { movies: [], music: [], tv: [], anime: [], manga, source, continueWatching: [] };
-  return { movies, music, tv, anime, manga, source, continueWatching };
+    // Real items with artwork drive the home hero (never mock).
+    const featured = source.filter((i) => i.backdropUrl).slice(0, 6);
+
+    if (activeSection === "movies") return { movies, music: [], tv: [], anime: [], manga: [], source, continueWatching: [], featured: [] };
+    if (activeSection === "music")  return { movies: [], music, tv: [], anime: [], manga: [], source, continueWatching: [], featured: [] };
+    if (activeSection === "tv")     return { movies: [], music: [], tv, anime: [], manga: [], source, continueWatching: [], featured: [] };
+    if (activeSection === "anime")  return { movies: [], music: [], tv: [], anime, manga: [], source, continueWatching: [], featured: [] };
+    if (activeSection === "manga")  return { movies: [], music: [], tv: [], anime: [], manga, source, continueWatching: [], featured: [] };
+    return { movies, music, tv, anime, manga, source, continueWatching, featured };
+  }, [activeSection, storeLibrary, jellyfinConfig, plexConfig, watchProgress]);
 }
 
+
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const [playerMedia,   setPlayerMedia]   = useState<MediaItem | null>(null);
   const [playerInitialTime, setPlayerInitialTime] = useState<number>(0);
-  const activeSection    = useButuStore((s) => s.activeSection);
+  const [playerPlaylist, setPlayerPlaylist] = useState<MediaItem[]>([]);
+  const [showExitDialog, setShowExitDialog] = useState(false);
+  const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevSelectedMedia = useRef<MediaItem | null>(null);
   const setWatchProgress = useButuStore((s) => s.setWatchProgress);
+  const settings         = useButuStore((s) => s.settings);
+  const libraryRefreshKey = useButuStore((s) => s.libraryRefreshKey);
+
+  const handlePlay = useCallback(
+    (item: MediaItem, initialTime?: number, playlist?: MediaItem[]) => {
+      prevSelectedMedia.current = selectedMedia;
+      const boostVoices = useButuStore.getState().settings.boostVoices;
+      setPlayerInitialTime(initialTime ?? 0);
+      setPlayerPlaylist(playlist ?? []);
+      setPlayerMedia(applyAudioPrefs(item, boostVoices));
+      setSelectedMedia(null);
+    },
+    [selectedMedia]
+  );
+
+  // Persist where we are in the current item. Keyed by the playing item's id
+  // (episode id for episodes) and tagged with seriesId so the show can surface
+  // it in Continue Watching.
+  const saveProgress = useCallback(
+    (media: MediaItem, time: number, duration?: number) => {
+      if (time <= 5) return;
+      setWatchProgress(media.id, {
+        time,
+        duration: duration ?? media.duration,
+        season: media.season,
+        episode: media.episode,
+        seriesId: media.seriesId,
+        updatedAt: Date.now(),
+      });
+    },
+    [setWatchProgress]
+  );
+
+  // Called periodically while playing so progress survives even if the user
+  // never presses Back (app reload, OS backgrounding, letting it run on).
+  const handlePlayerProgress = useCallback(
+    (p: { time: number; duration?: number }) => {
+      if (playerMedia) saveProgress(playerMedia, p.time, p.duration);
+    },
+    [playerMedia, saveProgress]
+  );
+
+  const handleClosePlayer = useCallback(
+    (progress?: { time: number; duration?: number; season?: number; episode?: number }) => {
+      if (progress && playerMedia) saveProgress(playerMedia, progress.time, progress.duration);
+      setPlayerMedia(null);
+      setPlayerPlaylist([]);
+      if (prevSelectedMedia.current) {
+        setSelectedMedia(prevSelectedMedia.current);
+        prevSelectedMedia.current = null;
+      }
+    },
+    [playerMedia, saveProgress]
+  );
+
+  // Episode finished playing → mark it watched, then auto-advance to the next
+  // episode in the playlist if there is one; otherwise behave like a close.
+  const handlePlayerEnded = useCallback(
+    (progress?: { time: number; duration?: number }) => {
+      if (playerMedia) {
+        const dur = progress?.duration ?? playerMedia.duration;
+        // Save at the very end so it counts as finished (drops out of resume).
+        saveProgress(playerMedia, dur ?? progress?.time ?? 0, dur);
+
+        const idx = playerPlaylist.findIndex((p) => p.id === playerMedia.id);
+        const next = idx >= 0 ? playerPlaylist[idx + 1] : undefined;
+        if (next && settings.autoPlayNext) {
+          setPlayerInitialTime(0);
+          setPlayerMedia(next);
+          return;
+        }
+      }
+      setPlayerMedia(null);
+      setPlayerPlaylist([]);
+      if (prevSelectedMedia.current) {
+        setSelectedMedia(prevSelectedMedia.current);
+        prevSelectedMedia.current = null;
+      }
+    },
+    [playerMedia, playerPlaylist, saveProgress, settings.autoPlayNext]
+  );
+  const activeSection    = useButuStore((s) => s.activeSection);
+  const setActiveSection = useButuStore((s) => s.setActiveSection);
+  const serverType       = useButuStore((s) => s.serverType);
   const jellyfinConfig   = useButuStore((s) => s.jellyfinConfig);
+  const plexConfig       = useButuStore((s) => s.plexConfig);
   const setLibrary       = useButuStore((s) => s.setLibrary);
   const setJellyfinLoading = useButuStore((s) => s.setJellyfinLoading);
   const setJellyfinError   = useButuStore((s) => s.setJellyfinError);
 
   useSpatialNavigation();
+  useTouchpadScroll();
+
+  // Initialize service worker and optimizations
+  useEffect(() => {
+    swManager.register();
+    
+    // Cleanup on unmount
+    return () => {
+      preloader.cleanup();
+      metadataCache.destroy();
+    };
+  }, []);
+
+  // Auto-focus first nav item on mount so TV remote works without clicking first
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const first = document.querySelector<HTMLElement>('[data-magnetic-id="nav-home"]');
+      first?.focus();
+    }, 300);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
-    if (!jellyfinConfig) return;
+    history.pushState({ butu: true }, "");
+  }, []);
+
+  useEffect(() => {
+    const handleBack = (e: PopStateEvent) => {
+      history.pushState({ butu: true }, "");
+
+      if (playerMedia) {
+        // Use handleClosePlayer so we restore the previously-open detail page
+        handleClosePlayer();
+        return;
+      }
+      if (selectedMedia) {
+        setSelectedMedia(null);
+        return;
+      }
+      if (activeSection !== "home") {
+        setActiveSection("home");
+        return;
+      }
+      setShowExitDialog(true);
+      if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
+      exitTimerRef.current = setTimeout(() => setShowExitDialog(false), 4000);
+    };
+
+    window.addEventListener("popstate", handleBack);
+    return () => window.removeEventListener("popstate", handleBack);
+  }, [playerMedia, selectedMedia, activeSection, setActiveSection, handleClosePlayer]);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" || e.key === "GoBack" || e.key === "BrowserBack") {
+        e.preventDefault();
+        if (playerMedia) { handleClosePlayer(); return; }
+        if (selectedMedia) { setSelectedMedia(null); return; }
+        if (activeSection !== "home") { setActiveSection("home"); return; }
+        setShowExitDialog(true);
+        if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
+        exitTimerRef.current = setTimeout(() => setShowExitDialog(false), 4000);
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [playerMedia, selectedMedia, activeSection, setActiveSection, handleClosePlayer]);
+
+  useEffect(() => {
+    if (!serverType) return;
+    if (serverType === "jellyfin" && !jellyfinConfig) return;
+    if (serverType === "plex" && !plexConfig) return;
+
     let cancelled = false;
-    async function load() {
+
+    async function loadLibrary() {
       setJellyfinLoading(true);
       setJellyfinError(null);
       try {
-        const [movies, series] = await Promise.all([
-          fetchLibrary(jellyfinConfig!, ["Movie"]),
-          fetchLibrary(jellyfinConfig!, ["Series"]),
-        ]);
-        if (cancelled) return;
-        const movieItems = movies.map((r) => rawToMediaItem(r, jellyfinConfig!));
-        const tvItems = await Promise.all(
-          series.map(async (r) => {
-            const item = rawToMediaItem(r, jellyfinConfig!);
-            try {
-              const eps = await fetchEpisodes(jellyfinConfig!, r.Id);
-              item.episodes = eps.map(rawToEpisode);
-            } catch { /* no episodes */ }
-            return item;
-          })
-        );
-        if (!cancelled) setLibrary([...movieItems, ...tvItems]);
+        if (serverType === "jellyfin") {
+          const rawItems = await fetchJellyfinLibrary(jellyfinConfig!);
+          const mediaItems = rawItems.map((r) => rawToMediaItem(r, jellyfinConfig!));
+          if (!cancelled) setLibrary(mediaItems);
+        } else if (serverType === "plex") {
+          const sections = await fetchPlexSections(plexConfig!);
+          const allMedia: MediaItem[] = [];
+          for (const s of sections) {
+            if (s.type === "movie" || s.type === "show") {
+              const rawItems = await fetchPlexSection(plexConfig!, s.key);
+              for (const raw of rawItems) {
+                allMedia.push(plexRawToMediaItem(raw, plexConfig!));
+              }
+            }
+          }
+          if (!cancelled) setLibrary(allMedia);
+        }
       } catch (e) {
-        if (!cancelled) setJellyfinError(e instanceof Error ? e.message : "Failed to load library");
+        if (!cancelled) setJellyfinError((e as Error).message);
       } finally {
         if (!cancelled) setJellyfinLoading(false);
       }
     }
-    load();
+    loadLibrary();
     return () => { cancelled = true; };
-  }, [jellyfinConfig, setLibrary, setJellyfinLoading, setJellyfinError]);
+  }, [serverType, jellyfinConfig, plexConfig, libraryRefreshKey, setLibrary, setJellyfinLoading, setJellyfinError]);
 
   const { updateFromIMU } = useSpatialCursor();
 
-  const handleIMUCoords = useCallback(
-    (x: number, y: number) => updateFromIMU(x, y),
-    [updateFromIMU]
-  );
-
-  const handlePhysicalClick = useCallback(() => {
-    const focused = document.querySelector<HTMLElement>("[data-magnetic]:hover");
-    focused?.click();
-  }, []);
-
-  useWebSocketBridge(handleIMUCoords, handlePhysicalClick);
-
-  const { movies, music, tv, anime, manga, source, continueWatching } = useFilteredLibrary();
-
-  const handleSelect = useCallback((item: MediaItem) => {
-    setSelectedMedia(item);
-  }, []);
-
-  const handlePlay = useCallback((item: MediaItem, initialTime?: number) => {
-    setPlayerInitialTime(initialTime ?? 0);
-    setPlayerMedia(item);
-    setSelectedMedia(null);
-  }, []);
-
-  const handleClosePlayer = useCallback(
-    (progress?: { time: number; season?: number; episode?: number }) => {
-      if (progress && playerMedia && progress.time > 5) {
-        setWatchProgress(playerMedia.id, {
-          time: progress.time,
-          season: progress.season,
-          episode: progress.episode,
-        });
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        if (e.key === " ") e.preventDefault();
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && active !== document.body) {
+          active.click();
+        }
       }
-      setPlayerMedia(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const mainRef = useRef<HTMLElement>(null);
+  const bgLayerRef = useRef<HTMLDivElement>(null);
+
+  // When a modal (detail page or player) is open, mark the background layer
+  // as inert so the focus manager can't accidentally target library cards behind it.
+  useEffect(() => {
+    const bg = bgLayerRef.current;
+    if (!bg) return;
+    if (selectedMedia || playerMedia) {
+      bg.setAttribute('inert', '');
+    } else {
+      bg.removeAttribute('inert');
+    }
+  }, [selectedMedia, playerMedia]);
+
+  useEffect(() => {
+    const handleScroll = (e: Event) => {
+      const dir = (e as CustomEvent<{ direction: number }>).detail?.direction ?? 0;
+      mainRef.current?.scrollBy({ top: dir * 300, behavior: "smooth" });
+    };
+    window.addEventListener("spatial-scroll", handleScroll);
+    return () => window.removeEventListener("spatial-scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const handleBack = () => {
+      if (playerMedia) { handleClosePlayer(); return; }
+      if (selectedMedia) { setSelectedMedia(null); return; }
+      if (activeSection !== "home") { setActiveSection("home"); return; }
+    };
+    window.addEventListener("spatial-back", handleBack);
+    return () => window.removeEventListener("spatial-back", handleBack);
+  }, [playerMedia, selectedMedia, activeSection, setActiveSection, handleClosePlayer]);
+
+  const { movies, music, tv, anime, manga, source, continueWatching, featured } = useFilteredLibrary();
+
+  const handleItemSelect = useCallback(
+    (item: MediaItem) => {
+      setSelectedMedia(item);
+      
+      // Defer predictive preloading to idle time — don't block navigation
+      const schedulePreload = window.requestIdleCallback ?? ((cb: () => void) => setTimeout(cb, 200));
+      schedulePreload(() => {
+        const predictions = preloader.predictNext(item.id, source);
+        const topPredictions = predictions.slice(0, 3);
+        preloader.preloadImages(topPredictions.map(p => p.item));
+        swManager.prefetchUrls(topPredictions.map(p => p.item.thumbnail));
+      });
     },
-    [playerMedia, setWatchProgress]
+    [source]
   );
 
-  if (!jellyfinConfig) {
-    return <JellyfinSetup />;
+  if (!serverType || (serverType === "jellyfin" && !jellyfinConfig) || (serverType === "plex" && !plexConfig)) {
+    // Setup is a form screen — it uses the real OS cursor (see .media-setup in index.css),
+    // so no liquid cursor here (it depends on the magnetic-snap system setup doesn't wire up).
+    return <MediaSetup />;
   }
 
   return (
-    <div
-      className="w-screen h-screen overflow-hidden relative"
-      style={{ background: "#000000" }}
-    >
+    <div className="h-screen bg-[#06080d] text-white flex overflow-hidden selection:bg-purple-500/30">
       <LiquidCursor />
-      <NavigationSidebar />
 
-      <main
-        className="h-full overflow-y-auto scrollbar-hide"
-        style={{ paddingLeft: 92 }}
-      >
-        {activeSection === "home" && (
+      {/* bg layer — marked inert when a detail page or player is open */}
+      <div ref={bgLayerRef} className="contents">
+        <NavigationSidebar />
+        <main
+          ref={mainRef}
+          className="flex-1 min-w-0 h-full overflow-y-auto scrollbar-hide"
+          style={{ paddingLeft: 80 }}
+        >
+        {activeSection === "home" && settings.showHero && featured.length > 0 && (
           <div className="relative h-[55vh] min-h-[480px] mb-12 flex-shrink-0">
-            <HeroCarousel items={heroSlides} onSelect={handleSelect} />
+            <HeroCarousel items={featured} onSelect={handleItemSelect} />
           </div>
         )}
 
@@ -169,11 +464,11 @@ export default function App() {
         >
           {activeSection === "home" && (
             <>
-              {continueWatching.length > 0 && (
+              {settings.showContinueWatching && continueWatching.length > 0 && (
                 <MediaStage
                   title="Continue Watching"
                   items={continueWatching}
-                  onSelect={handleSelect}
+                  onSelect={handleItemSelect}
                   metaLabel="RESUME PLAYBACK"
                 />
               )}
@@ -181,7 +476,7 @@ export default function App() {
                 <MediaStage
                   title="Cinema"
                   items={movies}
-                  onSelect={handleSelect}
+                  onSelect={handleItemSelect}
                   metaLabel="MOVIES · FILM LIBRARY"
                 />
               )}
@@ -189,7 +484,7 @@ export default function App() {
                 <MediaStage
                   title="Prestige Television"
                   items={tv}
-                  onSelect={handleSelect}
+                  onSelect={handleItemSelect}
                   metaLabel="TV SERIES · EPISODES"
                 />
               )}
@@ -197,7 +492,7 @@ export default function App() {
                 <MediaStage
                   title="Anime"
                   items={anime}
-                  onSelect={handleSelect}
+                  onSelect={handleItemSelect}
                   metaLabel="ANIME · SEASONS"
                 />
               )}
@@ -205,7 +500,7 @@ export default function App() {
                 <MediaStage
                   title="Manga"
                   items={manga}
-                  onSelect={handleSelect}
+                  onSelect={handleItemSelect}
                   metaLabel="MANGA · VOLUMES"
                 />
               )}
@@ -213,7 +508,7 @@ export default function App() {
                 <MediaStage
                   title="Sound Stage"
                   items={music}
-                  onSelect={handleSelect}
+                  onSelect={handleItemSelect}
                   metaLabel="MUSIC · ALBUMS"
                 />
               )}
@@ -230,7 +525,7 @@ export default function App() {
                   {movies.length} TITLES · FILM LIBRARY
                 </p>
               </div>
-              <MediaStage title="All Movies" items={movies} onSelect={handleSelect} />
+              <MediaStage title="All Movies" items={movies} onSelect={handleItemSelect} />
             </div>
           )}
 
@@ -244,7 +539,7 @@ export default function App() {
                   {anime.length} SERIES · SEASONS & EPISODES
                 </p>
               </div>
-              <MediaStage title="All Anime" items={anime} onSelect={handleSelect} />
+              <MediaStage title="All Anime" items={anime} onSelect={handleItemSelect} />
             </div>
           )}
 
@@ -258,7 +553,7 @@ export default function App() {
                   {manga.length} TITLES · VOLUMES
                 </p>
               </div>
-              <MediaStage title="All Manga" items={manga} onSelect={handleSelect} />
+              <MediaStage title="All Manga" items={manga} onSelect={handleItemSelect} />
             </div>
           )}
 
@@ -272,7 +567,7 @@ export default function App() {
                   {music.length} ALBUMS · HI-FI AUDIO
                 </p>
               </div>
-              <MediaStage title="Albums" items={music} onSelect={handleSelect} />
+              <MediaStage title="Albums" items={music} onSelect={handleItemSelect} />
             </div>
           )}
 
@@ -286,23 +581,24 @@ export default function App() {
                   {tv.length} SERIES · STREAMING QUALITY
                 </p>
               </div>
-              <MediaStage title="Series" items={tv} onSelect={handleSelect} />
+              <MediaStage title="Series" items={tv} onSelect={handleItemSelect} />
             </div>
           )}
 
           {activeSection === "search" && (
-            <SearchView onSelect={handleSelect} />
+            <SearchView onSelect={handleItemSelect} />
           )}
 
           {activeSection === "settings" && (
             <SettingsView />
           )}
 
-          {activeSection === "home" && movies.length === 0 && tv.length === 0 && anime.length === 0 && (
-            <JellyfinLoadingBanner />
+          {activeSection === "home" && source.length === 0 && (
+            <HomeStatus />
           )}
         </motion.div>
-      </main>
+        </main>
+      </div>{/* end bg layer */}
 
       <AnimatePresence>
         {selectedMedia && (
@@ -322,28 +618,105 @@ export default function App() {
             item={playerMedia}
             initialTime={playerInitialTime}
             onClose={handleClosePlayer}
+            onProgress={handlePlayerProgress}
+            onEnded={handlePlayerEnded}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Exit confirmation dialog */}
+      <AnimatePresence>
+        {showExitDialog && (
+          <motion.div
+            key="exit-dialog"
+            initial={{ opacity: 0, y: 40, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.97 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            style={{
+              position: "fixed",
+              bottom: "2.5rem",
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 9999,
+              background: "rgba(12, 14, 20, 0.96)",
+              border: "1px solid rgba(153, 247, 255, 0.2)",
+              borderRadius: "1.25rem",
+              padding: "1.5rem 2rem",
+              
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "1rem",
+              minWidth: 320,
+              boxShadow: "0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(153,247,255,0.08)",
+            }}
+          >
+            <p style={{ fontFamily: "inherit", fontWeight: 700, fontSize: "1.05rem", color: "#e0e6f0", letterSpacing: "-0.01em" }}>
+              Leave Butu?
+            </p>
+            <p style={{ fontSize: "0.75rem", color: "#9aa3b4", letterSpacing: "0.04em", textAlign: "center" }}>
+              Press ← Back again to exit, or any other key to stay.
+            </p>
+            <div style={{ display: "flex", gap: "0.75rem", width: "100%" }}>
+              <button
+                onClick={() => setShowExitDialog(false)}
+                style={{
+                  flex: 1, padding: "0.6rem", borderRadius: "0.75rem",
+                  background: "rgba(153, 247, 255, 0.08)",
+                  border: "1px solid rgba(153, 247, 255, 0.18)",
+                  color: "#99f7ff", fontWeight: 600, fontSize: "0.78rem",
+                  letterSpacing: "0.08em", cursor: "pointer",
+                }}
+              >
+                STAY
+              </button>
+              <button
+                onClick={() => { window.history.go(-100); }}
+                style={{
+                  flex: 1, padding: "0.6rem", borderRadius: "0.75rem",
+                  background: "rgba(255, 80, 80, 0.1)",
+                  border: "1px solid rgba(255, 80, 80, 0.25)",
+                  color: "#ff6b6b", fontWeight: 600, fontSize: "0.78rem",
+                  letterSpacing: "0.08em", cursor: "pointer",
+                }}
+              >
+                EXIT
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showSplash && (
+          <SplashScreen onComplete={() => setShowSplash(false)} />
         )}
       </AnimatePresence>
     </div>
   );
 }
 
-function JellyfinLoadingBanner() {
+function HomeStatus() {
   const loading = useButuStore((s) => s.jellyfinLoading);
   const error   = useButuStore((s) => s.jellyfinError);
-  if (!loading && !error) return null;
   return (
-    <div className="px-20 py-6">
-      {loading && (
+    <div className="px-20 py-24 flex flex-col items-center text-center gap-2">
+      {loading ? (
         <p className="font-mono-tech text-on_surface_variant text-sm animate-pulse">
-          Loading library from Jellyfin…
+          Loading your library…
         </p>
-      )}
-      {error && (
-        <p className="font-mono-tech text-sm" style={{ color: "#ff6b6b" }}>
-          ⚠ {error}
-        </p>
+      ) : error ? (
+        <p className="font-mono-tech text-sm" style={{ color: "#ff6b6b" }}>⚠ {error}</p>
+      ) : (
+        <>
+          <p className="font-display font-semibold text-on_surface" style={{ fontSize: 18 }}>
+            No media found
+          </p>
+          <p className="font-body text-on_surface_variant text-sm">
+            Your server's libraries look empty, or are still scanning.
+          </p>
+        </>
       )}
     </div>
   );
@@ -351,9 +724,7 @@ function JellyfinLoadingBanner() {
 
 function SearchView({ onSelect }: { onSelect: (item: MediaItem) => void }) {
   const [query, setQuery]    = useState("");
-  const storeLibrary         = useButuStore((s) => s.library);
-  const jellyfinConfig       = useButuStore((s) => s.jellyfinConfig);
-  const source = jellyfinConfig && storeLibrary.length > 0 ? storeLibrary : mockLibrary;
+  const source               = useButuStore((s) => s.library);
   const results = query.length > 1
     ? source.filter((i) =>
         i.title.toLowerCase().includes(query.toLowerCase()) ||
@@ -388,7 +759,7 @@ function SearchView({ onSelect }: { onSelect: (item: MediaItem) => void }) {
           style={{
             background: "rgba(22,26,38,0.8)",
             border: "1px solid rgba(46,52,71,0.4)",
-            backdropFilter: "blur(20px)",
+            
             cursor: "none",
             caretColor: "#99f7ff",
           }}
@@ -435,10 +806,191 @@ function SearchView({ onSelect }: { onSelect: (item: MediaItem) => void }) {
   );
 }
 
+function SettingSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="mb-7 max-w-2xl">
+      <p className="font-mono-tech text-xs tracking-[0.22em] mb-3" style={{ color: "rgba(153,247,255,0.55)" }}>{title}</p>
+      <div className="grid gap-3">{children}</div>
+    </div>
+  );
+}
+
+function ToggleRow({ label, sub, value, onChange }: { label: string; sub: string; value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div
+      data-magnetic
+      data-magnetic-id={`toggle-${label}`}
+      onClick={() => onChange(!value)}
+      className="flex items-center justify-between p-5 rounded-xl"
+      style={{ background: "rgba(22,26,38,0.7)", border: "1px solid rgba(46,52,71,0.3)", cursor: "pointer" }}
+    >
+      <div className="pr-4">
+        <p className="font-display font-semibold text-on_surface text-base">{label}</p>
+        <p className="font-body text-on_surface_variant text-sm mt-0.5">{sub}</p>
+      </div>
+      <div
+        className="relative flex-shrink-0"
+        style={{
+          width: 46, height: 26, borderRadius: 999,
+          background: value ? "linear-gradient(135deg,#99f7ff,#00f1fe)" : "rgba(255,255,255,0.08)",
+          border: "1px solid " + (value ? "rgba(153,247,255,0.4)" : "rgba(255,255,255,0.1)"),
+          transition: "background 0.2s",
+        }}
+      >
+        <motion.span
+          animate={{ x: value ? 22 : 2 }}
+          transition={{ type: "spring", stiffness: 500, damping: 32 }}
+          style={{ position: "absolute", top: 2, width: 20, height: 20, borderRadius: "50%", background: value ? "#001f24" : "#9aa3b4" }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Explicit "Reload library" action with a real button and visible state machine
+ * (idle → syncing spinner → "Updated ✓"), rather than a row that looks like navigation.
+ */
+function ReloadLibraryRow({ count, isLoading, onReload }: { count: number; isLoading: boolean; onReload: () => void }) {
+  const [phase, setPhase] = useState<"idle" | "syncing" | "done">("idle");
+  const sawLoading = useRef(false);
+
+  // Watch the global load flag: once a sync we started actually begins and then
+  // finishes, flip to the "done" confirmation.
+  useEffect(() => {
+    if (phase !== "syncing") return;
+    if (isLoading) { sawLoading.current = true; return; }
+    if (sawLoading.current) { sawLoading.current = false; setPhase("done"); }
+  }, [isLoading, phase]);
+
+  // Auto-dismiss "done", and a safety net so "syncing" can never get stuck.
+  useEffect(() => {
+    if (phase === "done") {
+      const t = setTimeout(() => setPhase("idle"), 1800);
+      return () => clearTimeout(t);
+    }
+    if (phase === "syncing") {
+      const t = setTimeout(() => { sawLoading.current = false; setPhase("idle"); }, 15000);
+      return () => clearTimeout(t);
+    }
+  }, [phase]);
+
+  const busy = phase === "syncing" || isLoading;
+  const click = () => {
+    if (busy) return;
+    sawLoading.current = false;
+    setPhase("syncing");
+    onReload();
+  };
+
+  const btn =
+    phase === "done"
+      ? { text: "Updated", bg: "rgba(70,220,140,0.14)", fg: "#5ee0a0", bd: "rgba(70,220,140,0.35)" }
+      : busy
+      ? { text: "Syncing…", bg: "rgba(153,247,255,0.10)", fg: "#99f7ff", bd: "rgba(153,247,255,0.30)" }
+      : { text: "Reload now", bg: "rgba(153,247,255,0.12)", fg: "#99f7ff", bd: "rgba(153,247,255,0.30)" };
+
+  return (
+    <div className="flex items-center justify-between p-6 rounded-xl"
+      style={{ background: "rgba(22,26,38,0.7)", border: "1px solid rgba(46,52,71,0.3)" }}
+    >
+      <div>
+        <p className="font-display font-semibold text-on_surface text-base">Reload library</p>
+        <p className="font-body text-on_surface_variant text-sm mt-0.5">
+          {count} items loaded · re-fetch everything from your server
+        </p>
+      </div>
+      <motion.button
+        data-magnetic
+        data-magnetic-id="settings-reload"
+        onClick={click}
+        disabled={busy && phase !== "done"}
+        className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-body text-sm font-semibold"
+        style={{ background: btn.bg, color: btn.fg, border: `1px solid ${btn.bd}`, cursor: "none" }}
+        whileHover={busy ? {} : { scale: 1.03 }}
+        whileTap={busy ? {} : { scale: 0.97 }}
+      >
+        {phase === "syncing" || isLoading ? (
+          <motion.span
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, ease: "linear", duration: 0.8 }}
+            style={{ display: "inline-block", width: 14, height: 14, borderRadius: "50%",
+              border: "2px solid rgba(153,247,255,0.3)", borderTopColor: "#99f7ff" }}
+          />
+        ) : phase === "done" ? (
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5ee0a0" strokeWidth="3">
+            <polyline points="20,6 9,17 4,12" />
+          </svg>
+        ) : (
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#99f7ff" strokeWidth="2">
+            <polyline points="23 4 23 10 17 10" />
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+          </svg>
+        )}
+        {btn.text}
+      </motion.button>
+    </div>
+  );
+}
+
+function SettingRow({ label, meta, sub, onClick }: { label: string; meta: string; sub: string; onClick?: () => void }) {
+  return (
+    <motion.div
+      data-magnetic
+      data-magnetic-id={`settings-${label}`}
+      onClick={onClick}
+      className="flex items-center justify-between p-6 rounded-xl"
+      style={{
+        background: "rgba(22,26,38,0.7)",
+        border: "1px solid rgba(46,52,71,0.3)",
+        cursor: onClick ? "pointer" : "none",
+      }}
+      whileHover={onClick ? { background: "rgba(30,35,48,0.9)", borderColor: "rgba(153,247,255,0.15)" } : {}}
+      transition={{ duration: 0.2 }}
+    >
+      <div>
+        <p className="font-display font-semibold text-on_surface text-base">{label}</p>
+        <p className="font-body text-on_surface_variant text-sm mt-0.5">{sub}</p>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="font-mono-tech text-primary text-xs">{meta}</span>
+        {onClick && (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9aa3b4" strokeWidth="2">
+            <polyline points="9,18 15,12 9,6" />
+          </svg>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
 function SettingsView() {
+  const plexConfig        = useButuStore((s) => s.plexConfig);
   const jellyfinConfig    = useButuStore((s) => s.jellyfinConfig);
+  const serverType        = useButuStore((s) => s.serverType);
+  const setPlexConfig     = useButuStore((s) => s.setPlexConfig);
   const setJellyfinConfig = useButuStore((s) => s.setJellyfinConfig);
+  const setServerType     = useButuStore((s) => s.setServerType);
+  const setLibrary        = useButuStore((s) => s.setLibrary);
   const storeLibrary      = useButuStore((s) => s.library);
+  const settings          = useButuStore((s) => s.settings);
+  const updateSettings    = useButuStore((s) => s.updateSettings);
+  const clearWatchProgress = useButuStore((s) => s.clearWatchProgress);
+  const refreshLibrary    = useButuStore((s) => s.refreshLibrary);
+  const isLoading         = useButuStore((s) => s.jellyfinLoading);
+  const [showMarkerDetect, setShowMarkerDetect] = useState(false);
+  const [showDonate, setShowDonate] = useState(false);
+  const [cleared, setCleared] = useState(false);
+
+  const active = serverType === "plex" ? plexConfig : serverType === "jellyfin" ? jellyfinConfig : null;
+  const serverLabel = serverType === "plex" ? "PLEX" : "JELLYFIN";
+
+  const disconnect = () => {
+    setPlexConfig(null);
+    setJellyfinConfig(null);
+    setLibrary([]);
+    setServerType(null); // → returns to the setup screen
+  };
 
   return (
     <div className="px-20 pt-10 pb-20">
@@ -446,25 +998,20 @@ function SettingsView() {
         Settings
       </h1>
 
-      {jellyfinConfig && (
+      {active && (
         <div className="mb-8 p-6 rounded-2xl max-w-2xl"
           style={{ background: "rgba(22,26,38,0.7)", border: "1px solid rgba(153,247,255,0.1)" }}
         >
-          <p className="font-mono-tech text-xs text-on_surface_variant mb-1">JELLYFIN SERVER</p>
-          <p className="font-display font-semibold text-on_surface">{jellyfinConfig.serverUrl}</p>
+          <p className="font-mono-tech text-xs text-on_surface_variant mb-1">{serverLabel} SERVER</p>
+          <p className="font-display font-semibold text-on_surface" style={{ wordBreak: "break-all" }}>{active.serverUrl}</p>
           <p className="font-body text-on_surface_variant text-sm mt-0.5">
-            Signed in as <span style={{ color: "#99f7ff" }}>{jellyfinConfig.userName}</span>
+            {active.userName ? <>Signed in as <span style={{ color: "#99f7ff" }}>{active.userName}</span></> : "Connected"}
             {storeLibrary.length > 0 && ` · ${storeLibrary.length} items`}
           </p>
           <motion.button
-            onClick={() => setJellyfinConfig(null)}
+            onClick={disconnect}
             className="mt-4 px-5 py-2 rounded-xl font-body text-sm"
-            style={{
-              background: "rgba(255,80,80,0.1)",
-              color: "#ff6b6b",
-              border: "1px solid rgba(255,80,80,0.2)",
-              cursor: "none",
-            }}
+            style={{ background: "rgba(255,80,80,0.1)", color: "#ff6b6b", border: "1px solid rgba(255,80,80,0.2)", cursor: "none" }}
             whileHover={{ background: "rgba(255,80,80,0.18)" }}
             whileTap={{ scale: 0.97 }}
           >
@@ -473,49 +1020,56 @@ function SettingsView() {
         </div>
       )}
 
-      <div className="grid gap-4 max-w-2xl">
-        {[
-          { label: "Display", meta: "4K · HDR · Dolby Vision", sub: "Output resolution and color space" },
-          { label: "Audio", meta: "FLAC · Dolby Atmos", sub: "Audio output and format preferences" },
-          { label: "Air Mouse", meta: "WebSocket · Port 9001", sub: "Gyroscope spatial controller connection" },
-          { label: "Library", meta: jellyfinConfig ? `${storeLibrary.length} ITEMS` : "MOCK DATA", sub: "Media scanning and indexing" },
-          { label: "Appearance", meta: "BUTU DARK", sub: "Theme and interface customization" },
-        ].map((s) => (
-          <motion.div
-            key={s.label}
-            data-magnetic
-            data-magnetic-id={`settings-${s.label}`}
-            className="flex items-center justify-between p-6 rounded-xl"
-            style={{
-              background: "rgba(22,26,38,0.7)",
-              border: "1px solid rgba(46,52,71,0.3)",
-              backdropFilter: "blur(20px)",
-              cursor: "none",
-            }}
-            whileHover={{
-              background: "rgba(30,35,48,0.9)",
-              borderColor: "rgba(153,247,255,0.15)",
-            }}
-            transition={{ duration: 0.2 }}
-          >
-            <div>
-              <p className="font-display font-semibold text-on_surface text-base">{s.label}</p>
-              <p className="font-body text-on_surface_variant text-sm mt-0.5">{s.sub}</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="font-mono-tech text-primary text-xs">{s.meta}</span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9aa3b4" strokeWidth="2">
-                <polyline points="9,18 15,12 9,6" />
-              </svg>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+      <SettingSection title="PLAYBACK">
+        <ToggleRow label="Auto-skip intros" sub="Jump past detected intro markers automatically"
+          value={settings.autoSkipIntro} onChange={(v) => updateSettings({ autoSkipIntro: v })} />
+        <ToggleRow label="Auto-skip credits" sub="Jump past end-credits automatically"
+          value={settings.autoSkipCredits} onChange={(v) => updateSettings({ autoSkipCredits: v })} />
+        <ToggleRow label="Auto-play next episode" sub="Continue to the next episode when one ends"
+          value={settings.autoPlayNext} onChange={(v) => updateSettings({ autoPlayNext: v })} />
+        <ToggleRow label="Boost voices" sub="Downmix surround to stereo and lift dialogue so speech isn't drowned out by effects"
+          value={settings.boostVoices} onChange={(v) => updateSettings({ boostVoices: v })} />
+      </SettingSection>
 
-      <div className="mt-16">
-        <p className="font-mono-tech text-on_surface_variant text-xs mb-2">BUTU v0.1.0</p>
+      <SettingSection title="HOME SCREEN">
+        <ToggleRow label="Featured hero" sub="Show the large rotating banner at the top of Home"
+          value={settings.showHero} onChange={(v) => updateSettings({ showHero: v })} />
+        <ToggleRow label="Continue Watching" sub="Show the resume rail on the Home screen"
+          value={settings.showContinueWatching} onChange={(v) => updateSettings({ showContinueWatching: v })} />
+      </SettingSection>
+
+      <SettingSection title="LIBRARY">
+        <ReloadLibraryRow count={storeLibrary.length} isLoading={isLoading} onReload={refreshLibrary} />
+        <SettingRow label="Clear watch history" meta={cleared ? "CLEARED" : "RESET"}
+          sub="Remove all saved playback positions and Continue Watching"
+          onClick={() => { clearWatchProgress(); setCleared(true); }} />
+      </SettingSection>
+
+      <SettingSection title="COMPANION">
+        <SettingRow label="Marker Auto-Detect" meta="INTROS + CREDITS"
+          sub="Fingerprint your library and contribute markers to the Butu cloud DB"
+          onClick={() => setShowMarkerDetect(true)} />
+        <SettingRow label="Air Mouse" meta="COMING SOON"
+          sub="Gyroscopic phone remote — coming soon" />
+      </SettingSection>
+
+      {DONATE_ENABLED && (
+        <SettingSection title="SUPPORT">
+          <SettingRow label="Support Butu" meta="DONATE"
+            sub="Butu is free. If it's useful to you, you can support development ❤"
+            onClick={() => setShowDonate(true)} />
+        </SettingSection>
+      )}
+
+      <AnimatePresence>
+        {showMarkerDetect && <MarkerAutoDetectModal onClose={() => setShowMarkerDetect(false)} />}
+        {showDonate && <DonateModal onClose={() => setShowDonate(false)} />}
+      </AnimatePresence>
+
+      <div className="mt-10 max-w-2xl">
+        <p className="font-mono-tech text-on_surface_variant text-xs mb-1">BUTU v0.1.0</p>
         <p className="font-mono-tech text-on_surface_variant text-xs opacity-50">
-          Tauri · Rust · React · TypeScript
+          Crowdsourced intro/credits markers · Tauri · React
         </p>
       </div>
     </div>

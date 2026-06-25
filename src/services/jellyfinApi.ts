@@ -70,20 +70,21 @@ interface JellyfinRawItem {
     IsFavorite: boolean;
     LastPlayedDate?: string;
   };
+  ProviderIds?: Record<string, string>;
 }
 
 // ─── Library ──────────────────────────────────────────────────────────────────
 
-export async function fetchLibrary(
+export async function fetchJellyfinLibrary(
   cfg: JellyfinConfig,
-  types: string[] = ["Movie", "Series"]
+  itemTypes: string[] = ["Movie", "Series", "Audio"]
 ): Promise<JellyfinRawItem[]> {
   const base = cfg.serverUrl.replace(/\/$/, "");
   const params = new URLSearchParams({
-    IncludeItemTypes: types.join(","),
+    IncludeItemTypes: itemTypes.join(","),
     Recursive: "true",
     Fields:
-      "Overview,Genres,GenreItems,MediaSources,BackdropImageTags,UserData,RunTimeTicks,ImageTags",
+      "Overview,Genres,GenreItems,MediaSources,BackdropImageTags,UserData,RunTimeTicks,ImageTags,ProviderIds",
     SortBy: "SortName",
     SortOrder: "Ascending",
     Limit: "500",
@@ -97,14 +98,31 @@ export async function fetchLibrary(
   return data.Items as JellyfinRawItem[];
 }
 
-export async function fetchEpisodes(
+/** Season numbers for a series, used by the marker modal's season picker. */
+export async function fetchJellyfinSeasons(
+  cfg: JellyfinConfig,
+  seriesId: string
+): Promise<number[]> {
+  const base = cfg.serverUrl.replace(/\/$/, "");
+  const res = await fetch(
+    `${base}/Shows/${seriesId}/Seasons?userId=${cfg.userId}`,
+    { headers: authHeader(cfg.token) }
+  );
+  if (!res.ok) return [];
+  const data = await res.json();
+  return ((data.Items ?? []) as JellyfinRawItem[])
+    .map((s) => s.IndexNumber)
+    .filter((n): n is number => typeof n === "number");
+}
+
+export async function fetchJellyfinEpisodes(
   cfg: JellyfinConfig,
   seriesId: string
 ): Promise<JellyfinRawItem[]> {
   const base = cfg.serverUrl.replace(/\/$/, "");
   const params = new URLSearchParams({
     UserId: cfg.userId,
-    Fields: "Overview,MediaSources,UserData,RunTimeTicks",
+    Fields: "Overview,MediaSources,UserData,RunTimeTicks,ProviderIds",
     SortBy: "ParentIndexNumber,IndexNumber",
     Limit: "500",
   });
@@ -231,15 +249,22 @@ export function rawToMediaItem(
       ? `${(ms.Bitrate / 1_000_000).toFixed(0)} Mbps`
       : undefined,
     streamUrl: streamUrl(cfg, raw.Id),
+    externalIds: raw.ProviderIds
+      ? Object.entries(raw.ProviderIds).map(([k, v]) => `${k.toLowerCase()}://${v}`)
+      : undefined,
   };
 }
 
 export function rawToEpisode(raw: JellyfinRawItem): Episode {
   return {
+    id: raw.Id,
     season: raw.ParentIndexNumber ?? 1,
     episode: raw.IndexNumber ?? 1,
     title: raw.Name,
     duration: raw.RunTimeTicks ? ticksToSeconds(raw.RunTimeTicks) : 45 * 60,
     description: raw.Overview,
+    externalIds: raw.ProviderIds
+      ? Object.entries(raw.ProviderIds).map(([k, v]) => `${k.toLowerCase()}://${v}`)
+      : undefined,
   };
 }

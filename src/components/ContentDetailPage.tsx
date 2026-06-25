@@ -1,7 +1,8 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { MediaItem, Episode } from "../types";
 import { useButuStore } from "../store/useButuStore";
+import { fetchPlexEpisodes, plexRawToEpisode } from "../services/plexApi";
 
 function fmt(s: number): string {
   const h = Math.floor(s / 3600);
@@ -20,65 +21,152 @@ function fmtDur(s: number): string {
 
 interface Props {
   item: MediaItem;
-  onPlay: (item: MediaItem, initialTime?: number) => void;
+  // playlist: the ordered list of playable items for this title, so the player
+  // can auto-advance to the next episode when one finishes.
+  onPlay: (item: MediaItem, initialTime?: number, playlist?: MediaItem[]) => void;
   onClose: () => void;
 }
 
 export function ContentDetailPage({ item, onPlay, onClose }: Props) {
   const watchProgress = useButuStore((s) => s.watchProgress);
+  const plexConfig    = useButuStore((s) => s.plexConfig);
+  // Movie / non-episodic resume point (keyed by the title's own id).
   const prog = watchProgress[item.id];
 
-  const isEpisodic =
-    (item.type === "tv" || item.type === "anime") && !!item.episodes?.length;
+  const [loadedEpisodes, setLoadedEpisodes] = useState<Episode[]>(item.episodes ?? []);
+  const [episodesLoading, setEpisodesLoading] = useState(false);
+  const playBtnRef = useRef<HTMLButtonElement>(null);
 
-  const seasons = isEpisodic
-    ? [...new Set(item.episodes!.map((e) => e.season))].sort((a, b) => a - b)
+  // Auto-focus Play button when page opens so remote works immediately
+  useEffect(() => {
+    const t = setTimeout(() => playBtnRef.current?.focus(), 120);
+    return () => clearTimeout(t);
+  }, [item.id]);
+
+  // Pre-warm the Plex/Jellyfin session: fetch the stream manifest now so the
+  // server starts generating HLS segments. By the time the user presses play,
+  // several seconds of segments are already buffered on the server side.
+  useEffect(() => {
+    const src = item.streamUrl ?? (item as any).url;
+    if (!src) return;
+    const controller = new AbortController();
+    fetch(src, { signal: controller.signal })
+      .then((res) => {
+        // Read and discard the manifest body — just need the server to start
+        res.text().catch(() => {});
+      })
+      .catch(() => {}); // AbortError and network errors are both fine here
+    return () => controller.abort();
+  }, [item.id, item.streamUrl]);
+
+  // Fetch episodes from Plex on-demand for TV shows
+  useEffect(() => {
+    const isPlexShow =
+      (item.type === "tv" || item.type === "anime") &&
+      item.plexKey &&
+      plexConfig &&
+      !item.episodes?.length;
+
+    if (!isPlexShow) return;
+
+    let cancelled = false;
+    setEpisodesLoading(true);
+    fetchPlexEpisodes(plexConfig!, `/library/metadata/${item.id}`)
+      .then((raws) => {
+        if (!cancelled) setLoadedEpisodes(raws.map((r) => plexRawToEpisode(r, plexConfig!)));
+      })
+      .finally(() => { if (!cancelled) setEpisodesLoading(false); });
+
+    return () => { cancelled = true; };
+  }, [item.id, item.plexKey, item.type, plexConfig]);
+
+  // Episodes in a stable play order (season, then episode number) — used for
+  // the season grid, the resume lookup, and the auto-next playlist.
+  const sortedEps = useMemo(
+    () => [...loadedEpisodes].sort((a, b) => a.season - b.season || a.episode - b.episode),
+    [loadedEpisodes]
+  );
+  const episodes = sortedEps;
+
+  const isEpisodic =
+    (item.type === "tv" || item.type === "anime") &&
+    (!!episodes.length || episodesLoading);
+
+  const seasons = episodes.length
+    ? [...new Set(episodes.map((e) => e.season))].sort((a, b) => a - b)
     : [];
+
+  // The show's most-recently-watched, not-yet-finished episode. Progress is
+  // stored per episode (keyed by episode id), so we scan this show's episodes
+  // and pick the one with the newest updatedAt. Drives the "Continue · SxEy"
+  // button and the "Watching" badge.
+  const lastWatched = useMemo(() => {
+    let best: { ep: Episode; time: number } | null = null;
+    let bestAt = -1;
+    for (const ep of episodes) {
+      const p = watchProgress[ep.id];
+      if (!p || p.time <= 5) continue;
+      if (ep.duration && p.time > ep.duration * 0.95) continue; // finished
+      const at = p.updatedAt ?? 0;
+      if (at > bestAt) { bestAt = at; best = { ep, time: p.time }; }
+    }
+    return best;
+  }, [episodes, watchProgress]);
 
   const [activeSeason, setActiveSeason] = useState(
-    prog?.season ?? seasons[0] ?? 1
+    lastWatched?.ep.season ?? seasons[0] ?? 1
   );
 
-  const seasonEps = isEpisodic
-    ? item.episodes!.filter((e) => e.season === activeSeason)
-    : [];
+  const seasonEps = episodes.filter((e) => e.season === activeSeason);
+
+  // Merge a show with one of its episodes into a directly-playable MediaItem.
+  // Keeps the show id around as seriesId so progress can be attributed back to
+  // this show in Continue Watching.
+  const toPlayable = useCallback(
+    (ep: Episode): MediaItem => ({
+      ...item,
+      id: ep.id, // stream the episode, not the show
+      seriesId: item.id,
+      season: ep.season,
+      episode: ep.episode,
+      duration: ep.duration,
+      streamUrl: ep.streamUrl,
+      plexPartKey: ep.url,
+    }),
+    [item]
+  );
 
   const handlePlayEpisode = useCallback(
-    (ep: Episode) => {
-      const isResume =
-        prog?.season === ep.season && prog?.episode === ep.episode;
-      onPlay(
-        { ...item, season: ep.season, episode: ep.episode },
-        isResume ? prog!.time : undefined
-      );
+    (ep: Episode, opts?: { restart?: boolean }) => {
+      const p = watchProgress[ep.id];
+      const resume =
+        !opts?.restart && p && p.time > 5 && (!ep.duration || p.time < ep.duration * 0.95)
+          ? p.time
+          : undefined;
+      onPlay(toPlayable(ep), resume, episodes.map(toPlayable));
     },
-    [item, prog, onPlay]
+    [episodes, watchProgress, toPlayable, onPlay]
   );
 
   const handleMainPlay = useCallback(() => {
-    if (prog) {
-      if (isEpisodic && prog.season != null && prog.episode != null) {
-        const ep = item.episodes!.find(
-          (e) => e.season === prog.season && e.episode === prog.episode
-        );
-        if (ep) { handlePlayEpisode(ep); return; }
-      }
-      onPlay(item, prog.time);
-    } else if (isEpisodic && item.episodes![0]) {
-      handlePlayEpisode(item.episodes![0]);
-    } else {
-      onPlay(item);
+    if (isEpisodic) {
+      if (lastWatched) { handlePlayEpisode(lastWatched.ep); return; }
+      if (episodes[0]) { handlePlayEpisode(episodes[0]); return; }
+      return;
     }
-  }, [item, prog, isEpisodic, onPlay, handlePlayEpisode]);
+    onPlay(item, prog?.time);
+  }, [isEpisodic, lastWatched, episodes, handlePlayEpisode, item, prog, onPlay]);
 
   const accent = item.ambientColor ?? "#99f7ff";
 
-  const resumeLabel = prog
-    ? isEpisodic && prog.season != null && prog.episode != null
-      ? `Continue · S${prog.season} E${prog.episode}  ${fmt(prog.time)}`
-      : `Resume · ${fmt(prog.time)}`
-    : isEpisodic
-    ? "Play from S1 E1"
+  const canResume = isEpisodic ? !!lastWatched : !!prog;
+
+  const resumeLabel = isEpisodic
+    ? lastWatched
+      ? `Continue · S${lastWatched.ep.season} E${lastWatched.ep.episode}  ${fmt(lastWatched.time)}`
+      : "Play from S1 E1"
+    : prog
+    ? `Resume · ${fmt(prog.time)}`
     : "Play";
 
   return (
@@ -117,11 +205,19 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
         <div className="px-20 pt-8 pb-2">
           <motion.button
             onClick={onClose}
+            className="focusable flex items-center gap-2"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClose();
+              }
+            }}
             data-magnetic
             data-magnetic-id="detail-back"
-            className="flex items-center gap-2"
             style={{ color: "rgba(224,230,240,0.55)", cursor: "none" }}
             whileHover={{ color: "#e0e6f0" }}
+            whileFocus={{ color: "#e0e6f0", scale: 1.05 }}
             whileTap={{ scale: 0.97 }}
           >
             <svg
@@ -205,8 +301,9 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
               )}
               {isEpisodic && (
                 <span className="font-mono-tech text-on_surface_variant text-sm">
-                  {seasons.length} Season{seasons.length > 1 ? "s" : ""} ·{" "}
-                  {item.episodes!.length} Episodes
+                  {episodesLoading
+                    ? "Loading episodes…"
+                    : `${seasons.length} Season${seasons.length > 1 ? "s" : ""} · ${episodes.length} Episodes`}
                 </span>
               )}
               {item.genre?.slice(0, 3).map((g) => (
@@ -286,10 +383,18 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
                 transition={{ duration: 0.4, delay: 0.27 }}
               >
                 <motion.button
+                  ref={playBtnRef}
+                  className="focusable flex items-center gap-3 px-8 py-4 rounded-2xl font-display font-bold text-base"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleMainPlay();
+                    }
+                  }}
                   data-magnetic
                   data-magnetic-id="detail-play"
                   onClick={handleMainPlay}
-                  className="flex items-center gap-3 px-8 py-4 rounded-2xl font-display font-bold text-base"
                   style={{
                     background: `linear-gradient(135deg, ${accent} 0%, #99f7ff 100%)`,
                     color: "#001f24",
@@ -297,6 +402,7 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
                     cursor: "none",
                   }}
                   whileHover={{ scale: 1.03 }}
+                  whileFocus={{ scale: 1.05 }}
                   whileTap={{ scale: 0.97 }}
                 >
                   <svg
@@ -310,16 +416,17 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
                   {resumeLabel}
                 </motion.button>
 
-                {prog && (
+                {canResume && (
                   <motion.button
+                    className="focusable flex items-center gap-2 px-6 py-4 rounded-2xl font-body text-sm"
+                    tabIndex={0}
                     data-magnetic
                     data-magnetic-id="detail-restart"
                     onClick={() => {
-                      if (isEpisodic && item.episodes![0])
-                        handlePlayEpisode(item.episodes![0]);
+                      if (isEpisodic && episodes[0])
+                        handlePlayEpisode(episodes[0], { restart: true });
                       else onPlay(item, 0);
                     }}
-                    className="flex items-center gap-2 px-6 py-4 rounded-2xl font-body text-sm"
                     style={{
                       background: "rgba(22,26,38,0.7)",
                       color: "rgba(224,230,240,0.7)",
@@ -330,6 +437,12 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
                       background: "rgba(30,35,48,0.9)",
                       color: "#e0e6f0",
                       borderColor: "rgba(153,247,255,0.2)",
+                    }}
+                    whileFocus={{
+                      background: "rgba(30,35,48,0.9)",
+                      color: "#e0e6f0",
+                      borderColor: "rgba(153,247,255,0.2)",
+                      scale: 1.05,
                     }}
                     whileTap={{ scale: 0.97 }}
                   >
@@ -377,7 +490,15 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
         </div>
 
         {/* ── Episodes ──────────────────────────────── */}
-        {isEpisodic && (
+        {episodesLoading && (
+          <div className="px-20 pb-8">
+            <div className="h-px mb-8" style={{ background: "rgba(153,247,255,0.06)" }} />
+            <p className="font-mono-tech text-on_surface_variant text-xs animate-pulse">
+              LOADING EPISODES…
+            </p>
+          </div>
+        )}
+        {isEpisodic && !episodesLoading && (
           <div className="px-20 pb-24">
             <div
               className="h-px mb-8"
@@ -392,10 +513,17 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
               {seasons.map((s) => (
                 <motion.button
                   key={s}
+                  className="focusable w-12 h-12 rounded-xl font-display font-bold text-sm"
+                  tabIndex={0}
                   data-magnetic
                   data-magnetic-id={`season-${s}`}
                   onClick={() => setActiveSeason(s)}
-                  className="w-12 h-12 rounded-xl font-display font-bold text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setActiveSeason(s);
+                    }
+                  }}
                   style={{
                     background:
                       activeSeason === s
@@ -410,7 +538,8 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
                     }`,
                     cursor: "none",
                   }}
-                  whileHover={{ scale: 1.06 }}
+                  whileHover={{ scale: 1.04 }}
+                  whileFocus={{ scale: 1.06 }}
                   whileTap={{ scale: 0.94 }}
                 >
                   {s}
@@ -432,20 +561,28 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
                 }}
               >
                 {seasonEps.map((ep, i) => {
-                  const isCurrentEp =
-                    prog?.season === ep.season &&
-                    prog?.episode === ep.episode;
-                  const epProgress = isCurrentEp
-                    ? prog!.time / ep.duration
-                    : null;
+                  const epProg = watchProgress[ep.id];
+                  const isCurrentEp = lastWatched?.ep.id === ep.id;
+                  const epProgress =
+                    epProg && epProg.time > 5 && ep.duration
+                      ? Math.min(1, epProg.time / ep.duration)
+                      : null;
 
                   return (
                     <motion.button
                       key={`s${ep.season}e${ep.episode}`}
+                      className="focusable w-full text-left rounded-xl p-4 flex gap-4 items-start"
+                      tabIndex={0}
                       data-magnetic
                       data-magnetic-id={`ep-${ep.season}-${ep.episode}`}
                       onClick={() => handlePlayEpisode(ep)}
-                      className="w-full text-left rounded-xl p-4 flex gap-4 items-start"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handlePlayEpisode(ep);
+                        }
+                      }}
+                      onFocus={(e) => e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.28, delay: i * 0.03 }}
@@ -463,6 +600,11 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
                       whileHover={{
                         background: "rgba(30,35,48,0.75)",
                         borderColor: "rgba(153,247,255,0.14)",
+                      }}
+                      whileFocus={{
+                        background: "rgba(30,35,48,0.75)",
+                        borderColor: "rgba(153,247,255,0.14)",
+                        scale: 1.02,
                       }}
                       whileTap={{ scale: 0.99 }}
                     >
@@ -532,7 +674,7 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
                               className="font-mono-tech text-[10px] mt-0.5"
                               style={{ color: accent }}
                             >
-                              {fmt(prog!.time)} / {fmtDur(ep.duration)}
+                              {fmt(epProg!.time)} / {fmtDur(ep.duration)}
                             </p>
                           </div>
                         )}

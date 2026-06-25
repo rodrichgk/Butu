@@ -22,7 +22,7 @@
       color: #e0e6f0;
       font-family: 'Space Grotesk', -apple-system, sans-serif;
       overflow: hidden;
-      touch-action: none;
+      /* touch-action:none removed from body — it silently kills button taps on iOS/Android */
     }
 
     #app {
@@ -179,6 +179,7 @@
       -webkit-user-select: none;
       transition: transform 0.1s, opacity 0.1s;
       touch-action: manipulation;
+      -webkit-tap-highlight-color: rgba(153,247,255,0.15);
     }
 
     .btn:active { transform: scale(0.95); opacity: 0.8; }
@@ -266,7 +267,7 @@
     .connect-btn {
       margin-top: 0.625rem;
       width: 100%;
-      padding: 0.625rem;
+      padding: 0.75rem;
       border-radius: 0.625rem;
       background: rgba(153, 247, 255, 0.1);
       border: 1px solid rgba(153, 247, 255, 0.2);
@@ -276,7 +277,11 @@
       letter-spacing: 0.1em;
       text-transform: uppercase;
       cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: rgba(153,247,255,0.2);
+      transition: background 0.15s;
     }
+    .connect-btn:active { background: rgba(153, 247, 255, 0.22); }
 
     .permission-overlay {
       position: fixed; inset: 0;
@@ -311,6 +316,8 @@
       font-size: 0.875rem;
       border: none;
       cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: rgba(153,247,255,0.3);
     }
 
     @media (min-height: 700px) {
@@ -412,16 +419,28 @@
     statusText.textContent = label;
   }
 
+  let reconnectTimer = null;
+
   function connect(host) {
-    if (ws) { ws.close(); ws = null; }
+    if (ws) { 
+      ws.onclose = null; // prevent old handler from firing
+      ws.onerror = null;
+      ws.close(); 
+      ws = null; 
+    }
+    setStatus(false, 'CONNECTING...');
     try {
       ws = new WebSocket(`ws://${host}:${WS_PORT}`);
       ws.onopen = () => setStatus(true, 'CONNECTED · AIR MOUSE ACTIVE');
       ws.onclose = () => {
         setStatus(false, 'DISCONNECTED');
-        setTimeout(() => connect(hostInput.value || 'localhost'), 4000);
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(() => connect(hostInput.value || 'localhost'), 4000);
       };
-      ws.onerror = () => ws.close();
+      ws.onerror = () => {
+        setStatus(false, 'ERROR');
+        ws.close();
+      };
       ws.onmessage = () => {};
     } catch(e) {
       setStatus(false, 'CONNECTION FAILED');
@@ -493,7 +512,7 @@
   });
 
   document.getElementById('btn-back').addEventListener('click', () => {
-    send({ type: 'scroll', data: { direction: -1 } });
+    send({ type: 'scroll', data: { direction: -999 } });
     navigator.vibrate?.(20);
   });
 
@@ -506,7 +525,12 @@
   });
 
   document.getElementById('reconnect-btn').addEventListener('click', () => {
-    connect(hostInput.value || 'localhost');
+    const host = hostInput.value.trim();
+    if (!host) {
+      setStatus(false, 'PLEASE ENTER IP');
+      return;
+    }
+    connect(host);
   });
 
   document.getElementById('mode-gyro').addEventListener('click', () => {
@@ -528,6 +552,7 @@
   });
 
   let lastTouchX = null, lastTouchY = null;
+  let virtualX = 0, virtualY = 0; // Relative tracked position mapped to absolute gamma/beta.
 
   function onTouchpadMove(e) {
     e.preventDefault();
@@ -540,17 +565,36 @@
       return;
     }
 
-    const dx = (e.clientX - lastTouchX) / rect.width;
-    const dy = (e.clientY - lastTouchY) / rect.height;
-
     const screenW = 1920, screenH = 1080;
+    
+    // Calculate raw pixel deltas
+    const rawDx = e.clientX - lastTouchX;
+    const rawDy = e.clientY - lastTouchY;
+    
+    // Translate real physical finger pixels to "screen pixels" virtually 
+    // Sensitivity multiplier: moving 100 pixels on pad moves X pixels on screen
+    const padSensitivity = 1.5; // Adjust this for faster/slower cursor movement
+    
+    virtualX += (rawDx / rect.width) * screenW * padSensitivity;
+    virtualY += (rawDy / rect.height) * screenH * padSensitivity;
+    
+    // Clamp to screen bounds
+    virtualX = Math.max(0, Math.min(screenW, virtualX));
+    virtualY = Math.max(0, Math.min(screenH, virtualY));
+
+    // Convert back to fake beta/gamma so spatial_bridge.rs translates it back cleanly
+    // In spatial_bridge.rs: 
+    // x = ((gamma + 45) / 90) * sw
+    // y = ((beta + 45) / 90) * sh
+    const targetGamma = (virtualX / screenW) * 90 - 45;
+    const targetBeta = (virtualY / screenH) * 90 - 45;
 
     send({
       type: 'imu',
       data: {
         alpha: 0,
-        beta: 45 + dy * screenH * 0.1,
-        gamma: -45 + (e.clientX - rect.left) / rect.width * 90,
+        beta: targetBeta,
+        gamma: targetGamma,
         timestamp: Date.now()
       }
     });
@@ -558,6 +602,12 @@
     lastTouchX = e.clientX;
     lastTouchY = e.clientY;
   }
+
+  // When switching to touchpad, let's roughly initialize to the center of the screen
+  document.getElementById('mode-touch').addEventListener('click', () => {
+    virtualX = 960;
+    virtualY = 540;
+  });
 
   touchpad.addEventListener('pointerup', () => {
     touchpad.classList.remove('active');

@@ -13,6 +13,22 @@ src-tauri/target/
 .env.local
 .env.*.local
 
+# Android signing — NEVER commit keys or passwords
+keystore.properties
+*.keystore
+*.jks
+*.apk
+*.aab
+*.idsig
+
+# Android (Gradle) build output & machine-specific config
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/
+
 # Vite / TypeScript cache
 *.tsbuildinfo
 .vite/
@@ -37,3 +53,5 @@ pnpm-debug.log*
 
 # Local Tauri dev config
 src-tauri/WixTools/
+
+.claude/

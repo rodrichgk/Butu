@@ -3,12 +3,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useButuStore } from "../store/useButuStore";
 
 // ─── Layout constants — single source of truth ────────────────────────────────
-const CW        = 64;   // collapsed sidebar width
-const EW        = 212;  // expanded sidebar width
-const ITEM_H    = 48;   // spacing-12 — rhythmic D-pad cadence, every icon center 48px apart
-const CIRCLE_D  = 40;   // glass backdrop circle diameter
+const CW        = 56;   // collapsed sidebar width
+const EW        = 196;  // expanded sidebar width
+const ITEM_H    = 38;   // nav item row height
+const CIRCLE_D  = 30;   // glass backdrop circle diameter
 const PILL_W    = 3;    // active indicator width
-const PILL_H    = 24;   // active indicator height
+const PILL_H    = 18;   // active indicator height
 const PILL_GAP  = 4;    // gap from sidebar outer-left edge
 
 // ─── Icons (20 × 20) — uniform stroke weight 1.6 ─────────────────────────────
@@ -124,10 +124,11 @@ export function NavigationSidebar() {
   return (
     <div style={{
       position: "fixed",
-      left: 16,
+      left: 14,
       top: "50%",
       transform: "translateY(-50%)",
       zIndex: 40,
+      display: "flex",
     }}>
       <motion.aside
         animate={{ width: expanded ? EW : CW }}
@@ -138,17 +139,13 @@ export function NavigationSidebar() {
           position: "relative",
           display: "flex",
           flexDirection: "column",
-          background: "rgba(12,14,19,0.72)",
-          backdropFilter: "blur(48px)",
-          WebkitBackdropFilter: "blur(48px)",
-          // Ghost border — single 1px declaration guarantees perfectly uniform thickness on all sides
+          background: "rgba(10,12,18,0.97)",
           border: "1px solid rgba(153,247,255,0.08)",
-          borderRadius: 28,
-          // Outer drop shadow + inner 0.5px highlight ring
+          borderRadius: 24,
           boxShadow: "0 12px 56px rgba(0,0,0,0.60), inset 0 0 0 0.5px rgba(255,255,255,0.04)",
           overflow: "hidden",
-          paddingTop: 20,
-          paddingBottom: 16,
+          paddingTop: 10,
+          paddingBottom: 8,
         }}
       >
 
@@ -164,9 +161,9 @@ export function NavigationSidebar() {
             justifyContent: "center",
           }}>
             <div style={{
-              width: 36,
-              height: 36,
-              borderRadius: 12,
+              width: 30,
+              height: 30,
+              borderRadius: 10,
               background: "linear-gradient(135deg, #99f7ff 0%, #00f1fe 100%)",
               display: "flex",
               alignItems: "center",
@@ -206,10 +203,9 @@ export function NavigationSidebar() {
           </AnimatePresence>
         </div>
 
-        {/* ── Editorial break — clear hierarchy gap below logo ──────────── */}
-        <div style={{ height: 16, flexShrink: 0 }} />
+        <div style={{ height: 4, flexShrink: 0 }} />
         <Hairline />
-        <div style={{ height: 8, flexShrink: 0 }} />
+        <div style={{ height: 2, flexShrink: 0 }} />
 
         {/* ── Nav items — strict ITEM_H rows, icon centers exactly 48px apart ─ */}
         {NAV_ITEMS.map((item) => {
@@ -220,7 +216,7 @@ export function NavigationSidebar() {
           return (
             <motion.button
               key={item.id}
-              className="focusable focus:outline-none"
+              className="focusable nav-sidebar-item focus:outline-none"
               data-magnetic
               data-magnetic-id={`nav-${item.id}`}
               onClick={() => setActiveSection(item.id)}
@@ -373,22 +369,20 @@ export function NavigationSidebar() {
         })}
 
         {/* ── Bottom section ───────────────────────────────────────────────── */}
-        <div style={{ height: 8, flexShrink: 0 }} />
+        <div style={{ height: 2, flexShrink: 0 }} />
         <Hairline />
 
         {/* Status dot — centered in CW column, matches logo x-position */}
         <div style={{
           width: CW,
-          height: 32,
+          height: 24,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           flexShrink: 0,
         }}>
           <motion.div
-            style={{ width: 6, height: 6, borderRadius: "50%", background: "#99f7ff" }}
-            animate={{ opacity: [0.2, 0.85, 0.2] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            style={{ width: 6, height: 6, borderRadius: "50%", background: "#99f7ff", opacity: 0.6 }}
           />
         </div>
 

@@ -1,0 +1,37 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "default",
+  "description": "Default capability for the Butu app",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "allow-native-play",
+    "allow-native-pause",
+    "allow-native-resume",
+    "allow-native-seek",
+    "allow-native-stop",
+    "allow-native-get-position",
+    "allow-fetch-plex",
+    "allow-fetch-plex-post",
+    "allow-get-ws-port",
+    "allow-get-screen-size",
+    "allow-analyze-library",
+    "allow-cancel-analysis",
+    "allow-submit-markers",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "binaries/ffmpeg",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/fpcalc",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    }
+  ]
+}

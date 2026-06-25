@@ -89,14 +89,11 @@ impl ImuSmoother {
         let clamped_gamma = smooth_gamma.clamp(-45.0, 45.0);
         let clamped_beta = (smooth_beta - 45.0).clamp(-45.0, 45.0);
 
-        let x = ((clamped_gamma + 45.0) / 90.0) * self.screen_width;
-        let y = ((clamped_beta + 45.0) / 90.0) * self.screen_height;
+        // Normalized 0-1 — frontend scales to actual window size
+        let x = ((clamped_gamma + 45.0) / 90.0).clamp(0.0, 1.0);
+        let y = ((clamped_beta + 45.0) / 90.0).clamp(0.0, 1.0);
 
-        ScreenCoords {
-            x: x.clamp(0.0, self.screen_width),
-            y: y.clamp(0.0, self.screen_height),
-            snapped: false,
-        }
+        ScreenCoords { x, y, snapped: false }
     }
 }
 

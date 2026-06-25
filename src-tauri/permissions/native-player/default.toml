@@ -1,0 +1,82 @@
+[default]
+description = "Default permissions — allow native player + app-level Plex bridge commands"
+permissions = [
+  "allow-native-play",
+  "allow-native-pause",
+  "allow-native-resume",
+  "allow-native-seek",
+  "allow-native-stop",
+  "allow-native-get-position",
+  "allow-fetch-plex",
+  "allow-fetch-plex-post",
+  "allow-get-ws-port",
+  "allow-get-screen-size",
+  "allow-analyze-library",
+  "allow-cancel-analysis",
+  "allow-submit-markers",
+]
+
+[[permission]]
+identifier = "allow-native-play"
+description = "Allows the nativePlay command"
+commands.allow = ["nativePlay"]
+
+[[permission]]
+identifier = "allow-native-pause"
+description = "Allows the nativePause command"
+commands.allow = ["nativePause"]
+
+[[permission]]
+identifier = "allow-native-resume"
+description = "Allows the nativeResume command"
+commands.allow = ["nativeResume"]
+
+[[permission]]
+identifier = "allow-native-seek"
+description = "Allows the nativeSeek command"
+commands.allow = ["nativeSeek"]
+
+[[permission]]
+identifier = "allow-native-stop"
+description = "Allows the nativeStop command"
+commands.allow = ["nativeStop"]
+
+[[permission]]
+identifier = "allow-native-get-position"
+description = "Allows the nativeGetPosition command"
+commands.allow = ["nativeGetPosition"]
+
+[[permission]]
+identifier = "allow-fetch-plex"
+description = "Allows the fetch_plex top-level Rust command"
+commands.allow = ["fetch_plex"]
+
+[[permission]]
+identifier = "allow-fetch-plex-post"
+description = "Allows the fetch_plex_post top-level Rust command"
+commands.allow = ["fetch_plex_post"]
+
+[[permission]]
+identifier = "allow-get-ws-port"
+description = "Allows the get_ws_port top-level Rust command"
+commands.allow = ["get_ws_port"]
+
+[[permission]]
+identifier = "allow-get-screen-size"
+description = "Allows the get_screen_size top-level Rust command"
+commands.allow = ["get_screen_size"]
+
+[[permission]]
+identifier = "allow-analyze-library"
+description = "Allows the analyze_library command for marker auto-detect"
+commands.allow = ["analyze_library"]
+
+[[permission]]
+identifier = "allow-cancel-analysis"
+description = "Allows the cancel_analysis command for marker auto-detect"
+commands.allow = ["cancel_analysis"]
+
+[[permission]]
+identifier = "allow-submit-markers"
+description = "Allows the submit_markers command for marker auto-detect"
+commands.allow = ["submit_markers"]

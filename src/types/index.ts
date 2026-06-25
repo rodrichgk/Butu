@@ -1,12 +1,16 @@
 export type MediaType = "movie" | "music" | "tv" | "web" | "anime" | "manga";
 
 export interface Episode {
+  id: string; // Episode-specific ratingKey or ItemId
+  url?: string; // Optional direct stream url / partKey
   season: number;
   episode: number;
   title: string;
   duration: number;
   description?: string;
   thumbnail?: string;
+  streamUrl?: string;
+  externalIds?: string[];
 }
 
 export interface MediaItem {
@@ -28,11 +32,24 @@ export interface MediaItem {
   trackNumber?: number;
   season?: number;
   episode?: number;
+  seriesId?: string;  // For tracking TV series episodes
   url?: string;
   streamUrl?: string;
   jellyfinId?: string;
+  plexKey?: string;        // ratingKey from Plex
+  plexPartKey?: string;    // Part key for direct stream
   ambientColor?: string;
   episodes?: Episode[];
+  externalIds?: string[];  // e.g. ["tmdb://1399", "tvdb://121361"]
+}
+
+export interface WatchProgressEntry {
+  time: number;          // resume position, seconds
+  duration?: number;     // total length, seconds — used for the "finished" cutoff
+  season?: number;
+  episode?: number;
+  seriesId?: string;     // show id this episode belongs to (for Continue Watching)
+  updatedAt?: number;    // epoch ms — picks the most-recently watched episode of a show
 }
 
 export interface CursorState {
@@ -86,3 +103,11 @@ export interface JellyfinConfig {
   userName: string;
   token: string;
 }
+
+export interface PlexConfig {
+  serverUrl: string;
+  token: string;
+  userName?: string;
+}
+
+export type ServerType = "jellyfin" | "plex";

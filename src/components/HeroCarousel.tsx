@@ -234,18 +234,28 @@ export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
             <motion.button
               data-magnetic
               data-magnetic-id={`hero-play-${current.id}`}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setPlayer({ currentMedia: current, isPlaying: true });
+                  onSelect(current);
+                }
+              }}
               onClick={() => {
                 setPlayer({ currentMedia: current, isPlaying: true });
                 onSelect(current);
               }}
-              className="focusable flex items-center gap-3 px-8 py-4 rounded-full font-display font-bold text-base focus:outline-none focus:ring-4 focus:ring-primary/40 focus:scale-[1.04]"
+              className="group relative px-8 py-3.5 rounded-full overflow-hidden focusable"
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              whileFocus={{ scale: 1.05 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
               style={{
                 background: "linear-gradient(135deg, #99f7ff 0%, #00f1fe 100%)",
-                color: "#001f24",
+                boxShadow: "0 8px 24px rgba(153,247,255,0.25), 0 0 0 1px rgba(255,255,255,0.1)",
+                cursor: "none",
               }}
-              whileHover={{ scale: 1.04 }}
-              whileTap={{ scale: 0.97 }}
-              transition={{ duration: 0.15 }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                 <polygon points="5,3 19,12 5,21" />
@@ -258,7 +268,15 @@ export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
             <motion.button
               data-magnetic
               data-magnetic-id={`hero-info-${current.id}`}
-              className="focusable flex items-center gap-3 px-8 py-4 rounded-full font-display font-bold text-base focus:outline-none focus:ring-4 focus:ring-white/20 focus:scale-[1.04]"
+              className="focusable flex items-center gap-3 px-8 py-4 rounded-full font-display font-bold text-base"
+              tabIndex={0}
+              onClick={() => onSelect(current)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelect(current);
+                }
+              }}
               style={{
                 background: "rgba(224,230,240,0.11)",
                 color: "#e0e6f0",
@@ -266,6 +284,7 @@ export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
               }}
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.97 }}
+              whileFocus={{ scale: 1.05 }}
               transition={{ duration: 0.15 }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -284,7 +303,15 @@ export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
         {items.map((_, i) => (
           <button
             key={i}
+            className="focusable"
+            tabIndex={0}
             onClick={() => goTo(i)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                goTo(i);
+              }
+            }}
             style={{
               width: i === activeIdx ? 24 : 6,
               height: 6,
