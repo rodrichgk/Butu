@@ -146,6 +146,21 @@
 /* Setup/login is a form screen — use the real OS cursor, not the TV-style liquid cursor
    (which depends on the magnetic-snap system that the setup screen doesn't wire up).
    !important overrides the global `cursor: none` and any inline styles on the controls. */
+/* The marketing landing is a normal scrollable web page — override the app's TV-style globals
+   (body + #root use overflow:hidden / height:100vh / user-select:none, which kill scroll + text
+   selection). position:fixed escapes the #root overflow clip; it scrolls its own content. */
+.landing {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.landing,
+.landing * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 .media-setup,
 .media-setup *,
 .landing,
