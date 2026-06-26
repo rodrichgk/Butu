@@ -66,6 +66,7 @@
       { "q": "Do I need my own server?", "a": "Yes. Butu plays your existing Plex or Jellyfin library — it doesn't host or provide any content itself." },
       { "q": "Is it free?", "a": "Completely free, and open-source. If it's useful you can support development, but you never have to." },
       { "q": "Is my data safe?", "a": "Your credentials stay on your device and Butu talks directly to your server. Nothing is routed through us." },
+      { "q": "Windows says \"unknown publisher\" — is it a virus?", "a": "No. Butu is open-source and unsigned (signing certificates are costly for an indie project), so Windows shows that warning for any small developer. Click More info → Run anyway. The full source and the public build are on GitHub if you want to check." },
       { "q": "Which devices?", "a": "Android TV today, with a Windows desktop app and this web version. Android phones are on the way." }
     ]
   },

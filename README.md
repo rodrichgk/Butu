@@ -86,6 +86,15 @@ cd android
 ./gradlew assembleRelease # signed release (needs keystore.properties — see keystore.properties.example)
 ```
 
+## Is it safe?
+
+Yes — and you don't have to take our word for it:
+
+- **It's 100% open-source.** Every line is in this repo; read it.
+- **Builds are public.** Releases are built by GitHub Actions from this source ([`.github/workflows/release.yml`](.github/workflows/release.yml)) — the binaries provably match the code.
+- **Windows may warn** *"unknown publisher"* — that's because Butu is unsigned (code-signing certs are costly for an indie project), **not** because anything's wrong. Click **More info → Run anyway**.
+- **Android** will ask you to allow installing from your browser/file manager (sideloading) — normal for any APK outside the Play Store.
+
 ## Privacy
 
 Butu stores your server credentials locally and connects **directly** to your media server. The only optional call to Butu's own infrastructure is the crowdsourced intro/credits marker database (no account, no personal data).

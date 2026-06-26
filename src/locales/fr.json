@@ -66,6 +66,7 @@
       { "q": "Dois-je avoir mon propre serveur ?", "a": "Oui. Butu lit votre bibliothèque Plex ou Jellyfin — l'appli ne fournit ni n'héberge aucun contenu." },
       { "q": "Est-ce gratuit ?", "a": "Entièrement gratuit, et open-source. Si c'est utile, vous pouvez soutenir le développement, mais ce n'est pas obligatoire." },
       { "q": "Mes données sont-elles en sécurité ?", "a": "Vos identifiants restent sur votre appareil et Butu communique directement avec votre serveur. Rien ne transite par nous." },
+      { "q": "Windows affiche « éditeur inconnu » — est-ce un virus ?", "a": "Non. Butu est open-source et non signé (les certificats de signature coûtent cher pour un projet indépendant), donc Windows affiche cet avertissement pour tout petit développeur. Cliquez sur Informations complémentaires → Exécuter quand même. Le code source et la build publique sont sur GitHub si vous voulez vérifier." },
       { "q": "Quels appareils ?", "a": "Android TV aujourd'hui, avec une application Windows et cette version web. Les téléphones Android sont prévus." }
     ]
   },
