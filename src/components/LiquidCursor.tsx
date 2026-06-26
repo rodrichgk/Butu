@@ -1,7 +1,10 @@
 import { useEffect } from "react";
 import { motion, useMotionValue, useSpring } from "framer-motion";
 import { useButuStore } from "../store/useButuStore";
-import { isAndroid } from "../utils/platform";
+import { isAndroid, isTouch } from "../utils/platform";
+
+// No custom cursor on Android or any touchscreen — there's no mouse to follow.
+const noCursor = isAndroid || isTouch;
 
 // Null on Android — no cursor, no subscriptions, no RAF
 export function LiquidCursor() {
@@ -15,12 +18,12 @@ export function LiquidCursor() {
   const springY = useSpring(cursorY, springConfig);
 
   useEffect(() => {
-    if (isAndroid) return;
+    if (noCursor) return;
     cursorX.set(cursor.x);
     cursorY.set(cursor.y);
   }, [cursor.x, cursor.y, cursorX, cursorY]);
 
-  if (isAndroid) return null;
+  if (noCursor) return null;
 
   const speed = Math.hypot(cursor.velocity.x, cursor.velocity.y);
   const stretchX = cursor.snapped ? 1 : Math.min(1 + speed * 0.04, 1.4);

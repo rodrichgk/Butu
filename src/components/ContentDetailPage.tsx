@@ -204,7 +204,7 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
       {/* ── Content ──────────────────────────────────── */}
       <div className="relative" style={{ zIndex: 1 }}>
         {/* Back bar */}
-        <div className="px-20 pt-8 pb-2">
+        <div className="px-4 md:px-20 pt-8 pb-2">
           <motion.button
             onClick={onClose}
             className="focusable flex items-center gap-2"
@@ -237,7 +237,7 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
         </div>
 
         {/* Hero */}
-        <div className="px-20 pt-6 pb-12 flex gap-10 items-start">
+        <div className="px-4 md:px-20 pt-6 pb-12 flex flex-col md:flex-row gap-6 md:gap-10 items-start">
           {/* Poster */}
           <motion.div
             className="flex-shrink-0 rounded-2xl overflow-hidden"
@@ -496,7 +496,7 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
 
         {/* ── Episodes ──────────────────────────────── */}
         {episodesLoading && (
-          <div className="px-20 pb-8">
+          <div className="px-4 md:px-20 pb-8">
             <div className="h-px mb-8" style={{ background: "rgba(153,247,255,0.06)" }} />
             <p className="font-mono-tech text-on_surface_variant text-xs animate-pulse">
               {t('detail.loading_episodes_caps')}
@@ -504,7 +504,7 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
           </div>
         )}
         {isEpisodic && !episodesLoading && (
-          <div className="px-20 pb-24">
+          <div className="px-4 md:px-20 pb-24">
             <div
               className="h-px mb-8"
               style={{ background: "rgba(153,247,255,0.06)" }}
@@ -562,7 +562,7 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
                 transition={{ duration: 0.22 }}
                 className="grid gap-3"
                 style={{
-                  gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 300px), 1fr))",
                 }}
               >
                 {seasonEps.map((ep, i) => {

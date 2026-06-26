@@ -5,6 +5,8 @@ import { LiquidCursor } from "./components/LiquidCursor";
 import { NavigationSidebar } from "./components/NavigationSidebar";
 import { HeroCarousel } from "./components/HeroCarousel";
 import { MediaStage } from "./components/MediaStage";
+import { MobileNav, MOBILE_NAV_HEIGHT } from "./components/MobileNav";
+import { useIsMobile } from "./hooks/useIsMobile";
 import { ButuPlayer } from "./components/ButuPlayer";
 import { ContentDetailPage } from "./components/ContentDetailPage";
 import { MediaSetup } from "./components/MediaSetup";
@@ -251,6 +253,7 @@ export default function App() {
   );
   const activeSection    = useButuStore((s) => s.activeSection);
   const setActiveSection = useButuStore((s) => s.setActiveSection);
+  const isMobile         = useIsMobile();
   const serverType       = useButuStore((s) => s.serverType);
   const jellyfinConfig   = useButuStore((s) => s.jellyfinConfig);
   const plexConfig       = useButuStore((s) => s.plexConfig);
@@ -451,14 +454,17 @@ export default function App() {
 
       {/* bg layer — marked inert when a detail page or player is open */}
       <div ref={bgLayerRef} className="contents">
-        <NavigationSidebar />
+        {isMobile ? <MobileNav /> : <NavigationSidebar />}
         <main
           ref={mainRef}
           className="flex-1 min-w-0 h-full overflow-y-auto scrollbar-hide"
-          style={{ paddingLeft: 80 }}
+          style={{
+            paddingLeft: isMobile ? 0 : 80,
+            paddingBottom: isMobile ? MOBILE_NAV_HEIGHT : 0,
+          }}
         >
         {activeSection === "home" && settings.showHero && featured.length > 0 && (
-          <div className="relative h-[55vh] min-h-[480px] mb-12 flex-shrink-0">
+          <div className="relative h-[42vh] min-h-[300px] md:h-[55vh] md:min-h-[480px] mb-6 md:mb-12 flex-shrink-0">
             <HeroCarousel items={featured} onSelect={handleItemSelect} />
           </div>
         )}
@@ -525,7 +531,7 @@ export default function App() {
 
           {activeSection === "movies" && movies.length > 0 && (
             <div className="pt-8">
-              <div className="px-20 mb-8">
+              <div className="px-4 md:px-20 mb-8">
                 <h1 className="font-display font-black text-on_surface" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
                   {t("categories.cinema")}
                 </h1>
@@ -539,7 +545,7 @@ export default function App() {
 
           {activeSection === "anime" && anime.length > 0 && (
             <div className="pt-8">
-              <div className="px-20 mb-8">
+              <div className="px-4 md:px-20 mb-8">
                 <h1 className="font-display font-black text-on_surface" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
                   {t("categories.anime")}
                 </h1>
@@ -553,7 +559,7 @@ export default function App() {
 
           {activeSection === "manga" && manga.length > 0 && (
             <div className="pt-8">
-              <div className="px-20 mb-8">
+              <div className="px-4 md:px-20 mb-8">
                 <h1 className="font-display font-black text-on_surface" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
                   {t("categories.manga")}
                 </h1>
@@ -567,7 +573,7 @@ export default function App() {
 
           {activeSection === "music" && music.length > 0 && (
             <div className="pt-8">
-              <div className="px-20 mb-8">
+              <div className="px-4 md:px-20 mb-8">
                 <h1 className="font-display font-black text-on_surface" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
                   {t("categories.sound_stage")}
                 </h1>
@@ -581,7 +587,7 @@ export default function App() {
 
           {activeSection === "tv" && tv.length > 0 && (
             <div className="pt-8">
-              <div className="px-20 mb-8">
+              <div className="px-4 md:px-20 mb-8">
                 <h1 className="font-display font-black text-on_surface" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
                   {t("categories.prestige_tv")}
                 </h1>
@@ -709,7 +715,7 @@ function HomeStatus() {
   const loading = useButuStore((s) => s.jellyfinLoading);
   const error   = useButuStore((s) => s.jellyfinError);
   return (
-    <div className="px-20 py-24 flex flex-col items-center text-center gap-2">
+    <div className="px-4 md:px-20 py-24 flex flex-col items-center text-center gap-2">
       {loading ? (
         <p className="font-mono-tech text-on_surface_variant text-sm animate-pulse">
           Loading your library…
@@ -742,7 +748,7 @@ function SearchView({ onSelect }: { onSelect: (item: MediaItem) => void }) {
     : [];
 
   return (
-    <div className="px-20 pt-10">
+    <div className="px-4 md:px-20 pt-10">
       <h1 className="font-display font-black text-on_surface mb-8" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
         Search
       </h1>
@@ -1002,7 +1008,7 @@ function SettingsView() {
   };
 
   return (
-    <div className="px-20 pt-10 pb-20">
+    <div className="px-4 md:px-20 pt-10 pb-20">
       <h1 className="font-display font-black text-on_surface mb-8" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
         {t("settings.title")}
       </h1>

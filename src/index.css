@@ -22,13 +22,21 @@
     overflow: hidden;
     width: 100vw;
     height: 100vh;
+    height: 100dvh; /* track the dynamic viewport so mobile browser chrome doesn't clip */
     user-select: none;
   }
 
   #root {
     width: 100vw;
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
+  }
+
+  /* The app shell uses Tailwind h-screen (100vh); on mobile prefer the dynamic
+     viewport so the bottom nav isn't hidden behind the URL bar. */
+  @supports (height: 100dvh) {
+    .h-screen { height: 100dvh; }
   }
 
   ::-webkit-scrollbar {
@@ -173,6 +181,19 @@
 .landing [role="button"] { cursor: pointer !important; }
 .media-setup input,
 .media-setup textarea { cursor: text !important; }
+
+/* ── Touch devices ────────────────────────────────────────────────────────────
+   The TV/desktop model hides the OS cursor (cursor: none) and reveals card info
+   on :hover — neither makes sense with a finger. On coarse pointers restore a
+   normal cursor and force hover-gated card info to stay visible. */
+@media (hover: none), (pointer: coarse) {
+  *, *::before, *::after { cursor: auto !important; }
+  a, button, [role="button"], .focusable { cursor: pointer !important; }
+  /* MediaCard info bar is opacity-0 until group-hover/focus — show it always. */
+  .card-info { opacity: 1 !important; transform: none !important; }
+  /* ...and darken the scrim enough that the always-on title stays legible. */
+  .card-scrim { opacity: 0.85 !important; }
+}
 
 /* TV/fullscreen focus ring suppression */
 *:focus {

@@ -90,11 +90,11 @@ export const MediaCard = memo(function MediaCard({ item, onSelect }: MediaCardPr
             </span>
           </div>
         )}
-        <div className="absolute inset-0 transition-opacity duration-300 opacity-40 group-hover:opacity-100 group-focus:opacity-100"
+        <div className="card-scrim absolute inset-0 transition-opacity duration-300 opacity-40 group-hover:opacity-100 group-focus:opacity-100"
           style={{ background: "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 50%, transparent 100%)" }} />
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 p-4 opacity-0 translate-y-2 transition-all duration-200 group-hover:opacity-100 group-hover:translate-y-0 group-focus:opacity-100 group-focus:translate-y-0">
+      <div className="card-info absolute bottom-0 left-0 right-0 p-4 opacity-0 translate-y-2 transition-all duration-200 group-hover:opacity-100 group-hover:translate-y-0 group-focus:opacity-100 group-focus:translate-y-0">
         <p className="font-display font-bold text-white leading-tight mb-1 line-clamp-2" style={{ fontSize: "0.9rem" }}>
           {item.title}
         </p>

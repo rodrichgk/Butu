@@ -45,7 +45,7 @@ export function MediaStage({ title, items, onSelect, featured = false, metaLabel
       animate={reducedMotion ? false : { opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
     >
-      <div className="flex items-end justify-between px-20 mb-0">
+      <div className="flex items-end justify-between px-4 md:px-20 mb-0">
         <div>
           <h2
             className="font-display font-bold text-on_surface"
@@ -60,7 +60,8 @@ export function MediaStage({ title, items, onSelect, featured = false, metaLabel
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Desktop/TV scroll arrows — on touch you just swipe the row. */}
+        <div className="hidden md:flex items-center gap-2">
           <motion.button
             onClick={() => scroll("left")}
             className="focusable w-10 h-10 rounded-full flex items-center justify-center"
@@ -116,8 +117,8 @@ export function MediaStage({ title, items, onSelect, featured = false, metaLabel
 
       <div
         ref={scrollRef}
-        className="flex gap-5 px-20 overflow-x-auto scrollbar-hide media-stage-scroll py-8"
-        style={{ scrollPaddingLeft: "5rem" }}
+        className="flex gap-3 md:gap-5 px-4 md:px-20 overflow-x-auto scrollbar-hide media-stage-scroll py-5 md:py-8"
+        style={{ scrollPaddingLeft: "1rem", WebkitOverflowScrolling: "touch" }}
       >
         {items.map((item, i) => (
           <CardWrapper key={item.id} i={i}>

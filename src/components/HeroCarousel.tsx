@@ -180,7 +180,7 @@ export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
           animate="center"
           exit="exit"
           transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
-          className="absolute bottom-0 left-0 pb-16 pl-20 pr-12 max-w-3xl"
+          className="absolute bottom-0 left-0 pb-8 md:pb-16 pl-4 md:pl-20 pr-4 md:pr-12 max-w-3xl"
           style={{ willChange: "transform, opacity" }}
         >
           <div className="flex items-center gap-3 mb-4">

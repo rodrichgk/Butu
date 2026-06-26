@@ -91,7 +91,7 @@ function SettingsIcon() {
   );
 }
 
-const NAV_ITEMS = [
+export const NAV_ITEMS = [
   { id: "home",     i18nKey: "nav.home",     icon: HomeIcon },
   { id: "movies",   i18nKey: "nav.movies",   icon: FilmIcon },
   { id: "music",    i18nKey: "nav.music",    icon: MusicIcon },
