@@ -49,6 +49,9 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+      # gradle.properties pins a local Windows JDK path; drop it so CI uses the runner's JDK 17.
+      - name: Use the runner JDK
+        run: sed -i '/org\.gradle\.java\.home/d' android/gradle.properties
       # Recreate the signing config from repo secrets (never stored in git).
       # Required secrets: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS.
       - name: Decode signing keystore
