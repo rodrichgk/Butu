@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -68,6 +69,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Text
+import dev.butu.R
 import dev.butu.domain.MediaItem
 import dev.butu.navigation.Section
 import dev.butu.ui.components.HeroCarousel
@@ -191,17 +193,17 @@ fun HomeScreen(
                     "audio" -> {
                         val currentLang = state.preferredAudioLanguage ?: ""
                         val audioLanguages = listOf(
-                            "None / Default" to "",
-                            "English" to "en",
-                            "French" to "fr",
-                            "Japanese" to "ja",
-                            "Spanish" to "es",
-                            "German" to "de",
-                            "Chinese" to "zh",
-                            "Korean" to "ko"
+                            stringResource(R.string.lang_default) to "",
+                            stringResource(R.string.lang_en) to "en",
+                            stringResource(R.string.lang_fr) to "fr",
+                            stringResource(R.string.lang_ja) to "ja",
+                            stringResource(R.string.lang_es) to "es",
+                            stringResource(R.string.lang_de) to "de",
+                            stringResource(R.string.lang_zh) to "zh",
+                            stringResource(R.string.lang_ko) to "ko"
                         )
                         SettingsSelectionDialog(
-                            title = "Preferred Audio Language",
+                            title = stringResource(R.string.settings_audio_title),
                             options = audioLanguages,
                             selectedValue = currentLang,
                             onSelect = {
@@ -213,19 +215,19 @@ fun HomeScreen(
                     }
                     "sub_lang" -> {
                         val currentLang = state.preferredSubtitleLanguage ?: ""
-                        val subtitleLanguages = listOf(
-                            "None / Default" to "",
-                            "English" to "en",
-                            "French" to "fr",
-                            "Spanish" to "es",
-                            "Japanese" to "ja",
-                            "German" to "de",
-                            "Chinese" to "zh",
-                            "Korean" to "ko"
+                        val subLanguages = listOf(
+                            stringResource(R.string.lang_default) to "",
+                            stringResource(R.string.lang_en) to "en",
+                            stringResource(R.string.lang_fr) to "fr",
+                            stringResource(R.string.lang_ja) to "ja",
+                            stringResource(R.string.lang_es) to "es",
+                            stringResource(R.string.lang_de) to "de",
+                            stringResource(R.string.lang_zh) to "zh",
+                            stringResource(R.string.lang_ko) to "ko"
                         )
                         SettingsSelectionDialog(
-                            title = "Preferred Subtitle Language",
-                            options = subtitleLanguages,
+                            title = stringResource(R.string.settings_pref_sub_title),
+                            options = subLanguages,
                             selectedValue = currentLang,
                             onSelect = {
                                 viewModel.setPreferredSubtitleLanguage(it.ifBlank { null })

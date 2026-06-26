@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Butu</string>
+    <string name="air_mouse_channel_name">Air Mouse (FR)</string>
+    <string name="air_mouse_notification_title">Butu Air Mouse</string>
+    <string name="air_mouse_notification_text">En attente des entrées du contrôleur téléphonique sur le port 9001</string>
+    <string name="com_google_android_gms_fonts_provider_authority">com.google.android.gms.fonts</string>
+    <string name="com_google_android_gms_fonts_provider_package">com.google.android.gms</string>
+
+    <string name="nav_home">Accueil</string>
+    <string name="nav_movies">Films</string>
+    <string name="nav_music">Musique</string>
+    <string name="nav_tv">Séries TV</string>
+    <string name="nav_anime">Anime</string>
+    <string name="nav_manga">Manga</string>
+    <string name="nav_search">Recherche</string>
+    <string name="nav_settings">Paramètres</string>
+
+    <string name="lang_default">Aucun / Par défaut</string>
+    <string name="lang_en">Anglais</string>
+    <string name="lang_fr">Français</string>
+    <string name="lang_ja">Japonais</string>
+    <string name="lang_es">Espagnol</string>
+    <string name="lang_de">Allemand</string>
+    <string name="lang_zh">Chinois</string>
+    <string name="lang_ko">Coréen</string>
+    
+    <string name="btn_close">Fermer</string>
+    <string name="btn_exit">Quitter</string>
+    <string name="btn_stay">Rester</string>
+    <string name="btn_disconnect">Déconnexion</string>
+
+    <string name="settings_title">Paramètres</string>
+    <string name="settings_subtitle">SERVEUR, LECTURE, AIR MOUSE</string>
+    <string name="settings_no_server">AUCUN SERVEUR</string>
+    <string name="settings_not_connected">Non connecté</string>
+    <string name="settings_signed_in">Connecté en tant que %1$s</string>
+    
+    <string name="settings_group_playback">LECTURE</string>
+    <string name="settings_group_home">ÉCRAN D\'ACCUEIL</string>
+    <string name="settings_group_remote">TÉLÉCOMMANDE</string>
+    <string name="settings_group_library">BIBLIOTHÈQUE</string>
+    <string name="settings_group_device">APPAREIL</string>
+    <string name="settings_group_support">SUPPORT</string>
+
+    <string name="settings_audio_title">Langue audio préférée</string>
+    <string name="settings_current">Actuel : %1$s</string>
+    <string name="settings_sub_title">Sous-titres</string>
+    <string name="settings_sub_subtitle">Afficher les sous-titres par défaut si disponibles</string>
+    <string name="settings_pref_sub_title">Langue de sous-titres préférée</string>
+    
+    <string name="settings_skip_intro_title">Passer les intros</string>
+    <string name="settings_skip_intro_subtitle">Sauter automatiquement les marqueurs d\'intro détectés</string>
+    
+    <string name="settings_skip_credits_title">Passer le générique</string>
+    <string name="settings_skip_credits_subtitle">Sauter automatiquement les crédits de fin</string>
+    
+    <string name="settings_auto_play_title">Lecture automatique du prochain épisode</string>
+    <string name="settings_auto_play_subtitle">Continuer à l\'épisode suivant lorsqu\'un épisode se termine</string>
+    
+    <string name="settings_boost_title">Amplifier les voix</string>
+    <string name="settings_boost_subtitle">Réduire le son surround en stéréo et augmenter les dialogues</string>
+    
+    <string name="settings_hero_title">Bannière vedette</string>
+    <string name="settings_hero_subtitle">Afficher la grande bannière en haut de l\'accueil</string>
+    
+    <string name="settings_continue_title">Continuer la lecture</string>
+    <string name="settings_continue_subtitle">Afficher la ligne de reprise sur l\'écran d\'accueil</string>
+    
+    <string name="settings_air_mouse_title">Passerelle Air Mouse</string>
+    <string name="settings_air_mouse_subtitle">Associez votre téléphone comme contrôleur inertiel/télécommande</string>
+    <string name="settings_air_mouse_server">Serveur Air Mouse</string>
+    <string name="settings_air_mouse_server_running">Le service d\'arrière-plan est en cours</string>
+    <string name="settings_air_mouse_server_stopped">Le serveur est arrêté</string>
+    
+    <string name="settings_reload_title">Recharger la bibliothèque</string>
+    <string name="settings_reload_subtitle">%1$d éléments chargés · resynchroniser depuis le serveur</string>
+    
+    <string name="settings_display_title">Affichage</string>
+    <string name="settings_display_subtitle">Rendu Compose natif à 120 Hz</string>
+    <string name="settings_display_info_title">Informations d\'affichage</string>
+    <string name="settings_display_info_desc">Le rendu Compose natif à 120 Hz est actif. L\'UI Butu est optimisée pour des transitions fluides.</string>
+    
+    <string name="settings_appearance_title">Apparence</string>
+    <string name="settings_appearance_subtitle">Thème Ouverture Cinématique Butu</string>
+    <string name="settings_appearance_info_title">Informations sur le thème</string>
+    <string name="settings_appearance_info_desc">Utilisation du thème sombre premium. Comprend des dégradés fluides et des superpositions.</string>
+    
+    <string name="settings_support_title">Soutenir Butu</string>
+    <string name="settings_support_subtitle">Butu est gratuit. Si cela vous est utile, vous pouvez soutenir le développement ❤</string>
+
+    <string name="settings_status_enabled">ACTIVÉ</string>
+    <string name="settings_status_disabled">DÉSACTIVÉ</string>
+    <string name="settings_status_on">OUI</string>
+    <string name="settings_status_off">NON</string>
+    <string name="settings_status_select">SÉLECTIONNER</string>
+    <string name="settings_status_info">INFO</string>
+    <string name="settings_status_donate">FAIRE UN DON</string>
+    <string name="settings_status_reload">RECHARGER</string>
+    <string name="settings_status_loading">CHARGEMENT…</string>
+    <string name="settings_status_connected">CONNECTÉ (%1$s)</string>
+    <string name="settings_status_active">ACTIF (ws://%1$s:9001)</string>
+
+    <string name="dialog_exit_title">Quitter Butu ?</string>
+    <string name="dialog_exit_desc">Appuyez à nouveau sur Retour pour quitter, ou restez ici.</string>
+
+    <string name="home_cinema">Cinéma</string>
+    <string name="home_cinema_sub">%1$d TITRES - BIBLIOTHÈQUE DE FILMS</string>
+    <string name="home_music">Scène sonore</string>
+    <string name="home_music_sub">%1$d ALBUMS - AUDIO HI-FI</string>
+    <string name="home_tv">Télévision de prestige</string>
+    <string name="home_tv_sub">%1$d SÉRIES - QUALITÉ STREAMING</string>
+    <string name="home_anime">Anime</string>
+    <string name="home_anime_sub">%1$d SÉRIES - SAISONS &amp; ÉPISODES</string>
+    <string name="home_manga">Manga</string>
+    <string name="home_manga_sub">%1$d TITRES - VOLUMES</string>
+    
+    <string name="home_all_movies">Tous les films</string>
+    <string name="home_albums">Albums</string>
+    <string name="home_series">Séries</string>
+    <string name="home_all_anime">Tous les animes</string>
+    <string name="home_all_manga">Tous les mangas</string>
+    
+    <string name="home_continue">Continuer la lecture</string>
+    <string name="home_continue_meta">REPRENDRE LA LECTURE</string>
+    <string name="home_movies_meta">FILMS - BIBLIOTHÈQUE</string>
+    <string name="home_tv_meta">SÉRIES TV - ÉPISODES</string>
+    <string name="home_anime_meta">ANIME - SAISONS</string>
+    <string name="home_manga_meta">MANGA - VOLUMES</string>
+    <string name="home_music_meta">MUSIQUE - ALBUMS</string>
+
+    <string name="search_title">Recherche</string>
+    <string name="search_sub">%1$d ÉLÉMENTS - TITRE, ARTISTE, GENRE</string>
+    <string name="search_placeholder">Rechercher dans votre bibliothèque</string>
+    <string name="search_no_matches">Aucun résultat</string>
+    <string name="search_no_matches_sub">Essayez un titre, un artiste, un album ou un genre.</string>
+    <string name="search_suggested">Suggéré</string>
+    <string name="search_results">Résultats de recherche</string>
+    <string name="search_matches">%1$d RÉSULTATS</string>
+
+    <string name="empty_nothing">Rien ici pour l\'instant</string>
+    <string name="empty_nothing_sub">Cette section se remplira lorsque votre serveur renverra des médias correspondants.</string>
+</resources>

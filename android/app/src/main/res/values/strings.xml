@@ -6,4 +6,138 @@
     <string name="air_mouse_notification_text">Listening for phone controller input on port 9001</string>
     <string name="com_google_android_gms_fonts_provider_authority">com.google.android.gms.fonts</string>
     <string name="com_google_android_gms_fonts_provider_package">com.google.android.gms</string>
+
+    <string name="nav_home">Home</string>
+    <string name="nav_movies">Movies</string>
+    <string name="nav_music">Music</string>
+    <string name="nav_tv">TV Shows</string>
+    <string name="nav_anime">Anime</string>
+    <string name="nav_manga">Manga</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_settings">Settings</string>
+
+    <string name="lang_default">None / Default</string>
+    <string name="lang_en">English</string>
+    <string name="lang_fr">French</string>
+    <string name="lang_ja">Japanese</string>
+    <string name="lang_es">Spanish</string>
+    <string name="lang_de">German</string>
+    <string name="lang_zh">Chinese</string>
+    <string name="lang_ko">Korean</string>
+    
+    <string name="btn_close">Close</string>
+    <string name="btn_exit">Exit</string>
+    <string name="btn_stay">Stay</string>
+    <string name="btn_disconnect">Disconnect</string>
+
+    <string name="settings_title">Settings</string>
+    <string name="settings_subtitle">SERVER, PLAYBACK, AIR MOUSE</string>
+    <string name="settings_no_server">NO SERVER</string>
+    <string name="settings_not_connected">Not connected</string>
+    <string name="settings_signed_in">Signed in as %1$s</string>
+    
+    <string name="settings_group_playback">PLAYBACK</string>
+    <string name="settings_group_home">HOME SCREEN</string>
+    <string name="settings_group_remote">REMOTE</string>
+    <string name="settings_group_library">LIBRARY</string>
+    <string name="settings_group_device">DEVICE</string>
+    <string name="settings_group_support">SUPPORT</string>
+
+    <string name="settings_audio_title">Preferred Audio Language</string>
+    <string name="settings_current">Current: %1$s</string>
+    <string name="settings_sub_title">Subtitles</string>
+    <string name="settings_sub_subtitle">Show subtitles by default when available</string>
+    <string name="settings_pref_sub_title">Preferred Subtitle Language</string>
+    
+    <string name="settings_skip_intro_title">Auto-skip intros</string>
+    <string name="settings_skip_intro_subtitle">Jump past detected intro markers automatically</string>
+    
+    <string name="settings_skip_credits_title">Auto-skip credits</string>
+    <string name="settings_skip_credits_subtitle">Jump past end-credits automatically</string>
+    
+    <string name="settings_auto_play_title">Auto-play next episode</string>
+    <string name="settings_auto_play_subtitle">Continue to the next episode when one ends</string>
+    
+    <string name="settings_boost_title">Boost voices</string>
+    <string name="settings_boost_subtitle">Downmix surround to stereo and lift dialogue so speech isn\'t drowned by effects</string>
+    
+    <string name="settings_hero_title">Featured hero</string>
+    <string name="settings_hero_subtitle">Show the large banner at the top of Home</string>
+    
+    <string name="settings_continue_title">Continue Watching</string>
+    <string name="settings_continue_subtitle">Show the resume rail on the Home screen</string>
+    
+    <string name="settings_air_mouse_title">Air Mouse Bridge</string>
+    <string name="settings_air_mouse_subtitle">Pair your phone as an inertial controller/remote</string>
+    <string name="settings_air_mouse_server">Air Mouse Server</string>
+    <string name="settings_air_mouse_server_running">Background service is running</string>
+    <string name="settings_air_mouse_server_stopped">Server is stopped</string>
+    
+    <string name="settings_reload_title">Reload Library</string>
+    <string name="settings_reload_subtitle">%1$d items loaded · re-sync from media server</string>
+    
+    <string name="settings_display_title">Display</string>
+    <string name="settings_display_subtitle">Native 120Hz Compose rendering</string>
+    <string name="settings_display_info_title">Display Info</string>
+    <string name="settings_display_info_desc">Native 120Hz Compose rendering is active on the current display. Butu UI is fully optimized for fluid TV navigation transitions.</string>
+    
+    <string name="settings_appearance_title">Appearance</string>
+    <string name="settings_appearance_subtitle">Butu Cinematic Aperture theme</string>
+    <string name="settings_appearance_info_title">Theme Info</string>
+    <string name="settings_appearance_info_desc">Using Butu Cinematic Aperture premium dark theme. Featuring HSL calibrated visual balances, smooth gradients, and glassmorphic overlays.</string>
+    
+    <string name="settings_support_title">Support Butu</string>
+    <string name="settings_support_subtitle">Butu is free. If it\'s useful to you, you can support development ❤</string>
+
+    <string name="settings_status_enabled">ENABLED</string>
+    <string name="settings_status_disabled">DISABLED</string>
+    <string name="settings_status_on">ON</string>
+    <string name="settings_status_off">OFF</string>
+    <string name="settings_status_select">SELECT</string>
+    <string name="settings_status_info">INFO</string>
+    <string name="settings_status_donate">DONATE</string>
+    <string name="settings_status_reload">RELOAD</string>
+    <string name="settings_status_loading">LOADING…</string>
+    <string name="settings_status_connected">CONNECTED (%1$s)</string>
+    <string name="settings_status_active">ACTIVE (ws://%1$s:9001)</string>
+
+    <string name="dialog_exit_title">Leave Butu?</string>
+    <string name="dialog_exit_desc">Press Back again to exit, or stay here.</string>
+
+    <string name="home_cinema">Cinema</string>
+    <string name="home_cinema_sub">%1$d TITLES - FILM LIBRARY</string>
+    <string name="home_music">Sound Stage</string>
+    <string name="home_music_sub">%1$d ALBUMS - HI-FI AUDIO</string>
+    <string name="home_tv">Prestige Television</string>
+    <string name="home_tv_sub">%1$d SERIES - STREAMING QUALITY</string>
+    <string name="home_anime">Anime</string>
+    <string name="home_anime_sub">%1$d SERIES - SEASONS &amp; EPISODES</string>
+    <string name="home_manga">Manga</string>
+    <string name="home_manga_sub">%1$d TITLES - VOLUMES</string>
+    
+    <string name="home_all_movies">All Movies</string>
+    <string name="home_albums">Albums</string>
+    <string name="home_series">Series</string>
+    <string name="home_all_anime">All Anime</string>
+    <string name="home_all_manga">All Manga</string>
+    
+    <string name="home_continue">Continue Watching</string>
+    <string name="home_continue_meta">RESUME PLAYBACK</string>
+    <string name="home_movies_meta">MOVIES - FILM LIBRARY</string>
+    <string name="home_tv_meta">TV SERIES - EPISODES</string>
+    <string name="home_anime_meta">ANIME - SEASONS</string>
+    <string name="home_manga_meta">MANGA - VOLUMES</string>
+    <string name="home_music_meta">MUSIC - ALBUMS</string>
+
+    <string name="search_title">Search</string>
+    <string name="search_sub">%1$d ITEMS - TITLE, ARTIST, GENRE</string>
+    <string name="search_placeholder">Search your library</string>
+    <string name="search_no_matches">No matches</string>
+    <string name="search_no_matches_sub">Try a title, artist, album, or genre.</string>
+    <string name="search_suggested">Suggested</string>
+    <string name="search_results">Search Results</string>
+    <string name="search_matches">%1$d MATCHES</string>
+
+    <string name="empty_nothing">Nothing here yet</string>
+    <string name="empty_nothing_sub">This section will fill when your server returns matching media.</string>
 </resources>

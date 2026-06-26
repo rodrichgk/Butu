@@ -20,13 +20,13 @@ object ButuDestination {
 }
 
 /** Top-level sections — drives the sidebar `activeSection` in src/store/useButuStore.ts. */
-enum class Section(val route: String, val label: String) {
-    Home("home", "Home"),
-    Movies("movies", "Movies"),
-    Music("music", "Music"),
-    Tv("tv", "TV Shows"),
-    Anime("anime", "Anime"),
-    Manga("manga", "Manga"),
-    Search("search", "Search"),
-    Settings("settings", "Settings");
+enum class Section(val route: String, @androidx.annotation.StringRes val labelRes: Int) {
+    Home("home", dev.butu.R.string.nav_home),
+    Movies("movies", dev.butu.R.string.nav_movies),
+    Music("music", dev.butu.R.string.nav_music),
+    Tv("tv", dev.butu.R.string.nav_tv),
+    Anime("anime", dev.butu.R.string.nav_anime),
+    Manga("manga", dev.butu.R.string.nav_manga),
+    Search("search", dev.butu.R.string.nav_search),
+    Settings("settings", dev.butu.R.string.nav_settings);
 }
