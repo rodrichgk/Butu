@@ -632,9 +632,9 @@ private fun SettingsContent(
     }
 }
 
-// TODO: replace with your real donation link (Ko-fi / Buy Me a Coffee / GitHub Sponsors / PayPal).
-// While it's the placeholder the Support row auto-hides, so we can ship before the link exists.
-private const val DONATE_URL = "https://example.com/donate"
+// Donation link (PayPal). The Support row + QR appear once this is a real URL; it auto-hides
+// while it's the example.com placeholder so we can ship without one.
+private const val DONATE_URL = "https://www.paypal.com/donate/?hosted_button_id=7YJ9V2CMFRRPW"
 private val DONATE_ENABLED = !DONATE_URL.contains("example.com")
 
 @Composable

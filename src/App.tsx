@@ -66,10 +66,9 @@ function applyAudioPrefs(item: MediaItem, boostVoices: boolean): MediaItem {
   return { ...item, streamUrl, url };
 }
 
-// TODO: replace with your real donation link (Ko-fi / Buy Me a Coffee / GitHub Sponsors / PayPal).
-// While it's still the placeholder the Support section auto-hides, so we can ship before the
-// donation link exists; setting a real URL makes it (and the QR) appear everywhere.
-const DONATE_URL = "https://example.com/donate";
+// Donation link (PayPal). The Support section + QR appear everywhere once this is a real URL;
+// it auto-hides while it's the example.com placeholder so we can ship without one.
+const DONATE_URL = "https://www.paypal.com/donate/?hosted_button_id=7YJ9V2CMFRRPW";
 const DONATE_ENABLED = !DONATE_URL.includes("example.com");
 
 function openExternal(url: string) {
