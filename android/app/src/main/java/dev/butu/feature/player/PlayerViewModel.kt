@@ -263,6 +263,17 @@ class PlayerViewModel @Inject constructor(
         val ordered = raw.sortedWith(compareBy({ it.season }, { it.episode }))
         seriesEpisodes = ordered
         currentEpisodeIndex = ordered.indexOfFirst { it.id == episodeId }
+        updateEpisodeNavState()
+    }
+
+    /** Reflect whether next/previous episodes exist so the player can show its skip buttons. */
+    private fun updateEpisodeNavState() {
+        _state.update {
+            it.copy(
+                hasPreviousEpisode = currentEpisodeIndex > 0,
+                hasNextEpisode = currentEpisodeIndex in 0 until seriesEpisodes.lastIndex,
+            )
+        }
     }
 
     fun togglePlayPause() {
@@ -628,6 +639,12 @@ class PlayerViewModel @Inject constructor(
         switchToEpisode(next)
     }
 
+    /** Switches the player to the previous episode. */
+    fun playPrevious() {
+        val prev = seriesEpisodes.getOrNull(currentEpisodeIndex - 1) ?: return
+        switchToEpisode(prev)
+    }
+
     /** Hide the up-next card for the rest of this episode. */
     fun dismissUpNext() {
         upNextDismissed = true
@@ -865,7 +882,16 @@ class PlayerViewModel @Inject constructor(
             val outgoingSeconds = (player.currentPosition / 1000L).toInt()
             reportStoppedRemote(outgoingSeconds)
 
+            // Persist the OUTGOING episode LOCALLY too — the report above only updates the
+            // Plex/Jellyfin server. Without this, jumping to the next episode left no local
+            // progress, so the episode looked "never played" and the show didn't advance in
+            // Continue Watching. persistWatchProgress marks it watched + advances the show when
+            // near the end, or saves the exact position if the user jumped early.
+            val outgoingDuration = if (player.duration == C.TIME_UNSET) 0 else (player.duration / 1000L).toInt()
+            runCatching { persistWatchProgress(current, outgoingSeconds, outgoingDuration) }
+
             currentEpisodeIndex = seriesEpisodes.indexOfFirst { it.id == episode.id }
+            updateEpisodeNavState()
             playingItemId = episode.id
             val primaryMarkers = episode.markers.filter { it.endMs > it.startMs }
             val needsFallback = !primaryMarkers.any { it.type == MarkerType.Intro } || 

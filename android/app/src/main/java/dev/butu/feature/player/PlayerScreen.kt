@@ -39,6 +39,8 @@ import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -268,6 +270,8 @@ fun PlayerScreen(
                 onSeekTo = { ms -> viewModel.seekTo(ms); resetControls() },
                 onToggleMute = { viewModel.setMuted(!state.isMuted); resetControls() },
                 onOpenTracks = { showTracks = true; resetControls() },
+                onPreviousEpisode = { viewModel.playPrevious(); resetControls() },
+                onNextEpisode = { viewModel.playNext(); resetControls() },
             )
         }
 
@@ -403,6 +407,8 @@ private fun ControlsOverlay(
     onSeekTo: (Long) -> Unit,
     onToggleMute: () -> Unit,
     onOpenTracks: () -> Unit,
+    onPreviousEpisode: () -> Unit,
+    onNextEpisode: () -> Unit,
 ) {
     Box(modifier = Modifier
         .fillMaxSize()
@@ -438,6 +444,8 @@ private fun ControlsOverlay(
             onSeekTo = onSeekTo,
             onToggleMute = onToggleMute,
             onOpenTracks = onOpenTracks,
+            onPreviousEpisode = onPreviousEpisode,
+            onNextEpisode = onNextEpisode,
         )
     }
 }
@@ -525,6 +533,8 @@ private fun BottomBar(
     onSeekTo: (Long) -> Unit,
     onToggleMute: () -> Unit,
     onOpenTracks: () -> Unit,
+    onPreviousEpisode: () -> Unit,
+    onNextEpisode: () -> Unit,
 ) {
     Column(modifier = Modifier
         .fillMaxWidth()
@@ -563,11 +573,15 @@ private fun BottomBar(
             ambient = ambient,
             playRequester = playRequester,
             hasTracks = state.audioTracks.isNotEmpty() || state.subtitleTracks.isNotEmpty(),
+            hasPreviousEpisode = state.hasPreviousEpisode,
+            hasNextEpisode = state.hasNextEpisode,
             onTogglePlay = onTogglePlay,
             onRewind = { onSeekBy(-SEEK_STEP_MS) },
             onForward = { onSeekBy(SEEK_STEP_MS) },
             onToggleMute = onToggleMute,
             onOpenTracks = onOpenTracks,
+            onPreviousEpisode = onPreviousEpisode,
+            onNextEpisode = onNextEpisode,
         )
     }
 }
@@ -648,11 +662,15 @@ private fun TransportControls(
     ambient: Color,
     playRequester: FocusRequester,
     hasTracks: Boolean,
+    hasPreviousEpisode: Boolean,
+    hasNextEpisode: Boolean,
     onTogglePlay: () -> Unit,
     onRewind: () -> Unit,
     onForward: () -> Unit,
     onToggleMute: () -> Unit,
     onOpenTracks: () -> Unit,
+    onPreviousEpisode: () -> Unit,
+    onNextEpisode: () -> Unit,
 ) {
     // Box (not a SpaceBetween Row) so the transport group sits DEAD CENTRE regardless of how
     // wide the side groups are. With SpaceBetween, the heavier right group (bitrate + CC +
@@ -672,12 +690,20 @@ private fun TransportControls(
                        else Icons.AutoMirrored.Filled.VolumeUp,
             )
         }
-        // Centre — rewind / play / forward, anchored to the true centre of the screen
+        // Centre — [prev episode] rewind / play / forward [next episode], anchored to centre.
         Row(
             modifier = Modifier.align(Alignment.Center),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            if (hasPreviousEpisode) {
+                CircleButton(
+                    onClick = onPreviousEpisode,
+                    contentDescription = "Previous episode",
+                    size = 44.dp,
+                    icon = Icons.Filled.SkipPrevious,
+                )
+            }
             CircleButton(
                 onClick = onRewind,
                 contentDescription = "Rewind 10 seconds",
@@ -696,6 +722,14 @@ private fun TransportControls(
                 size = 48.dp,
                 icon = Icons.Filled.Forward10,
             )
+            if (hasNextEpisode) {
+                CircleButton(
+                    onClick = onNextEpisode,
+                    contentDescription = "Next episode",
+                    size = 44.dp,
+                    icon = Icons.Filled.SkipNext,
+                )
+            }
         }
         // Right — bitrate + CC + fullscreen
         Row(

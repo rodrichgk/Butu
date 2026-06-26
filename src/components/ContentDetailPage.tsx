@@ -259,7 +259,10 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
                 display: "block",
               }}
               onError={(e) => {
-                (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${item.id}/400/600`;
+                const img = e.target as HTMLImageElement;
+                img.onerror = null; // avoid a loop
+                // Neutral dark poster — not a random stock photo (which looked like the wrong title).
+                img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 600'%3E%3Crect width='400' height='600' fill='%23121521'/%3E%3C/svg%3E";
               }}
             />
           </motion.div>

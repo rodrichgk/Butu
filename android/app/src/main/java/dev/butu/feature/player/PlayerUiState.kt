@@ -40,6 +40,9 @@ data class PlayerUiState(
     val error: String? = null,
     /** Next episode in the same show, or null when none / not a TV session. */
     val nextEpisode: Episode? = null,
+    /** Whether a next / previous episode exists — drives the player's episode-skip buttons. */
+    val hasNextEpisode: Boolean = false,
+    val hasPreviousEpisode: Boolean = false,
     /** True when we're in the "Up Next" overlay window — driven by the credits marker. */
     val showUpNext: Boolean = false,
     /** The intro/credits marker the playhead is currently inside, if any. */

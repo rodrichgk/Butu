@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { motion } from "framer-motion";
 import type { MediaItem } from "../types";
 import { reducedMotion } from "../utils/platform";
@@ -40,6 +40,7 @@ function CodecBadge({ codec }: { codec: string }) {
 export const MediaCard = memo(function MediaCard({ item, onSelect }: MediaCardProps) {
   const cardClass  = getCardClass(item.type);
   const widthClass = getCardWidth(item.type);
+  const [imgFailed, setImgFailed] = useState(false);
 
   return (
     <motion.button
@@ -66,16 +67,29 @@ export const MediaCard = memo(function MediaCard({ item, onSelect }: MediaCardPr
       }}
     >
       <div className="absolute inset-0 overflow-hidden rounded-lg">
-        <img
-          src={item.thumbnail}
-          alt={item.title}
-          className="w-full h-full object-cover"
-          loading="lazy"
-          decoding="async"
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${item.id}/400/600`;
-          }}
-        />
+        {item.thumbnail && !imgFailed ? (
+          <img
+            src={item.thumbnail}
+            alt={item.title}
+            className="w-full h-full object-cover"
+            loading="lazy"
+            decoding="async"
+            // On a failed load (common on mobile/flaky networks) show a neutral branded
+            // placeholder — NOT a random stock photo, which made cards look like the wrong title.
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center px-3 text-center"
+            style={{ background: "linear-gradient(160deg, #161a26 0%, #0c0e13 100%)" }}>
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="rgba(153,247,255,0.4)" strokeWidth="1.4">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <path d="M3 9h18M8 4v5M16 4v5" />
+            </svg>
+            <span className="font-display font-semibold mt-2 line-clamp-3" style={{ fontSize: "0.8rem", color: "rgba(224,230,240,0.7)" }}>
+              {item.title}
+            </span>
+          </div>
+        )}
         <div className="absolute inset-0 transition-opacity duration-300 opacity-40 group-hover:opacity-100 group-focus:opacity-100"
           style={{ background: "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 50%, transparent 100%)" }} />
       </div>
