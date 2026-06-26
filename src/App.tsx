@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { LiquidCursor } from "./components/LiquidCursor";
 import { NavigationSidebar } from "./components/NavigationSidebar";
 import { HeroCarousel } from "./components/HeroCarousel";
@@ -158,6 +159,7 @@ function useFilteredLibrary() {
 
 
 export default function App() {
+  const { t } = useTranslation();
   const [showSplash, setShowSplash] = useState(true);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const [playerMedia,   setPlayerMedia]   = useState<MediaItem | null>(null);
@@ -473,7 +475,7 @@ export default function App() {
             <>
               {settings.showContinueWatching && continueWatching.length > 0 && (
                 <MediaStage
-                  title="Continue Watching"
+                  title={t("categories.continue_watching")}
                   items={continueWatching}
                   onSelect={handleItemSelect}
                   metaLabel="RESUME PLAYBACK"
@@ -481,7 +483,7 @@ export default function App() {
               )}
               {movies.length > 0 && (
                 <MediaStage
-                  title="Cinema"
+                  title={t("categories.cinema")}
                   items={movies}
                   onSelect={handleItemSelect}
                   metaLabel="MOVIES · FILM LIBRARY"
@@ -489,7 +491,7 @@ export default function App() {
               )}
               {tv.length > 0 && (
                 <MediaStage
-                  title="Prestige Television"
+                  title={t("categories.prestige_tv")}
                   items={tv}
                   onSelect={handleItemSelect}
                   metaLabel="TV SERIES · EPISODES"
@@ -497,7 +499,7 @@ export default function App() {
               )}
               {anime.length > 0 && (
                 <MediaStage
-                  title="Anime"
+                  title={t("categories.anime")}
                   items={anime}
                   onSelect={handleItemSelect}
                   metaLabel="ANIME · SEASONS"
@@ -505,7 +507,7 @@ export default function App() {
               )}
               {manga.length > 0 && (
                 <MediaStage
-                  title="Manga"
+                  title={t("categories.manga")}
                   items={manga}
                   onSelect={handleItemSelect}
                   metaLabel="MANGA · VOLUMES"
@@ -513,7 +515,7 @@ export default function App() {
               )}
               {music.length > 0 && (
                 <MediaStage
-                  title="Sound Stage"
+                  title={t("categories.sound_stage")}
                   items={music}
                   onSelect={handleItemSelect}
                   metaLabel="MUSIC · ALBUMS"
@@ -526,13 +528,13 @@ export default function App() {
             <div className="pt-8">
               <div className="px-20 mb-8">
                 <h1 className="font-display font-black text-on_surface" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
-                  Cinema
+                  {t("categories.cinema")}
                 </h1>
                 <p className="font-mono-tech text-on_surface_variant text-sm mt-1">
                   {movies.length} TITLES · FILM LIBRARY
                 </p>
               </div>
-              <MediaStage title="All Movies" items={movies} onSelect={handleItemSelect} />
+              <MediaStage title={t("categories.all_movies")} items={movies} onSelect={handleItemSelect} />
             </div>
           )}
 
@@ -540,13 +542,13 @@ export default function App() {
             <div className="pt-8">
               <div className="px-20 mb-8">
                 <h1 className="font-display font-black text-on_surface" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
-                  Anime
+                  {t("categories.anime")}
                 </h1>
                 <p className="font-mono-tech text-on_surface_variant text-sm mt-1">
                   {anime.length} SERIES · SEASONS & EPISODES
                 </p>
               </div>
-              <MediaStage title="All Anime" items={anime} onSelect={handleItemSelect} />
+              <MediaStage title={t("categories.all_anime")} items={anime} onSelect={handleItemSelect} />
             </div>
           )}
 
@@ -554,13 +556,13 @@ export default function App() {
             <div className="pt-8">
               <div className="px-20 mb-8">
                 <h1 className="font-display font-black text-on_surface" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
-                  Manga
+                  {t("categories.manga")}
                 </h1>
                 <p className="font-mono-tech text-on_surface_variant text-sm mt-1">
                   {manga.length} TITLES · VOLUMES
                 </p>
               </div>
-              <MediaStage title="All Manga" items={manga} onSelect={handleItemSelect} />
+              <MediaStage title={t("categories.all_manga")} items={manga} onSelect={handleItemSelect} />
             </div>
           )}
 
@@ -568,13 +570,13 @@ export default function App() {
             <div className="pt-8">
               <div className="px-20 mb-8">
                 <h1 className="font-display font-black text-on_surface" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
-                  Sound Stage
+                  {t("categories.sound_stage")}
                 </h1>
                 <p className="font-mono-tech text-on_surface_variant text-sm mt-1">
                   {music.length} ALBUMS · HI-FI AUDIO
                 </p>
               </div>
-              <MediaStage title="Albums" items={music} onSelect={handleItemSelect} />
+              <MediaStage title={t("categories.albums")} items={music} onSelect={handleItemSelect} />
             </div>
           )}
 
@@ -582,13 +584,13 @@ export default function App() {
             <div className="pt-8">
               <div className="px-20 mb-8">
                 <h1 className="font-display font-black text-on_surface" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
-                  Prestige Television
+                  {t("categories.prestige_tv")}
                 </h1>
                 <p className="font-mono-tech text-on_surface_variant text-sm mt-1">
                   {tv.length} SERIES · STREAMING QUALITY
                 </p>
               </div>
-              <MediaStage title="Series" items={tv} onSelect={handleItemSelect} />
+              <MediaStage title={t("categories.series")} items={tv} onSelect={handleItemSelect} />
             </div>
           )}
 
@@ -972,6 +974,7 @@ function SettingRow({ label, meta, sub, onClick }: { label: string; meta: string
 }
 
 function SettingsView() {
+  const { t, i18n } = useTranslation();
   const plexConfig        = useButuStore((s) => s.plexConfig);
   const jellyfinConfig    = useButuStore((s) => s.jellyfinConfig);
   const serverType        = useButuStore((s) => s.serverType);
@@ -1002,7 +1005,7 @@ function SettingsView() {
   return (
     <div className="px-20 pt-10 pb-20">
       <h1 className="font-display font-black text-on_surface mb-8" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
-        Settings
+        {t("settings.title")}
       </h1>
 
       {active && (
@@ -1026,6 +1029,21 @@ function SettingsView() {
           </motion.button>
         </div>
       )}
+
+      <SettingSection title={t("settings.language", "LANGUAGE").toUpperCase()}>
+        <SettingRow 
+          label={t("settings.english")} 
+          meta={i18n.language.startsWith('en') ? "ACTIVE" : ""} 
+          sub="Switch language to English" 
+          onClick={() => i18n.changeLanguage('en')} 
+        />
+        <SettingRow 
+          label={t("settings.french")} 
+          meta={i18n.language.startsWith('fr') ? "ACTIVE" : ""} 
+          sub="Changer la langue en Français" 
+          onClick={() => i18n.changeLanguage('fr')} 
+        />
+      </SettingSection>
 
       <SettingSection title="PLAYBACK">
         <ToggleRow label="Auto-skip intros" sub="Jump past detected intro markers automatically"

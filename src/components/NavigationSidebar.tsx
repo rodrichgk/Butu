@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useButuStore } from "../store/useButuStore";
@@ -91,14 +92,14 @@ function SettingsIcon() {
 }
 
 const NAV_ITEMS = [
-  { id: "home",     label: "Home",     icon: HomeIcon },
-  { id: "movies",   label: "Movies",   icon: FilmIcon },
-  { id: "music",    label: "Music",    icon: MusicIcon },
-  { id: "tv",       label: "TV Shows", icon: TvIcon },
-  { id: "anime",    label: "Anime",    icon: AnimeIcon },
-  { id: "manga",    label: "Manga",    icon: MangaIcon },
-  { id: "search",   label: "Search",   icon: SearchIcon },
-  { id: "settings", label: "Settings", icon: SettingsIcon },
+  { id: "home",     i18nKey: "nav.home",     icon: HomeIcon },
+  { id: "movies",   i18nKey: "nav.movies",   icon: FilmIcon },
+  { id: "music",    i18nKey: "nav.music",    icon: MusicIcon },
+  { id: "tv",       i18nKey: "nav.tv",       icon: TvIcon },
+  { id: "anime",    i18nKey: "nav.anime",    icon: AnimeIcon },
+  { id: "manga",    i18nKey: "nav.manga",    icon: MangaIcon },
+  { id: "search",   i18nKey: "nav.search",   icon: SearchIcon },
+  { id: "settings", i18nKey: "nav.settings", icon: SettingsIcon },
 ];
 
 // ─── Hairline divider ─────────────────────────────────────────────────────────
@@ -116,6 +117,7 @@ function Hairline() {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export function NavigationSidebar() {
+  const { t } = useTranslation();
   const activeSection    = useButuStore((s) => s.activeSection);
   const setActiveSection = useButuStore((s) => s.setActiveSection);
   const [expanded,  setExpanded]  = useState(false);
@@ -360,7 +362,7 @@ export function NavigationSidebar() {
                       userSelect: "none",
                     }}
                   >
-                    {item.label}
+                    {t(item.i18nKey)}
                   </motion.span>
                 )}
               </AnimatePresence>

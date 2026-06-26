@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useEffect } from "react";
 import { Logo } from "./Logo";
+import { useTranslation } from "react-i18next";
 
 const WORD = ["B", "U", "T", "U"];
 // Center of the 4-letter word is between index 1 and 2 → 1.5.
@@ -12,9 +13,10 @@ interface SplashScreenProps {
 }
 
 export function SplashScreen({ onComplete, duration = 4200 }: SplashScreenProps) {
+  const { t } = useTranslation();
   useEffect(() => {
-    const t = setTimeout(onComplete, duration);
-    return () => clearTimeout(t);
+    const timer = setTimeout(onComplete, duration);
+    return () => clearTimeout(timer);
   }, [onComplete, duration]);
 
   return (
@@ -106,7 +108,7 @@ export function SplashScreen({ onComplete, duration = 4200 }: SplashScreenProps)
           className="font-mono-tech"
           style={{ marginTop: 14, fontSize: 11, letterSpacing: "0.38em", color: "#99f7ff" }}
         >
-          CINEMA · TELEVISION · SOUND
+          {t('splash.tagline')}
         </motion.p>
       </div>
 

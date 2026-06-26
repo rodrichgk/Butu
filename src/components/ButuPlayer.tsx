@@ -10,6 +10,7 @@ import {
 } from "../services/jellyfinApi";
 import { fetchCloudMarkers, CloudMarker } from "../services/markerService";
 import { fetchPlexSubtitleTracks, applyPlexSubtitle, type PlexSubtitleTrack } from "../services/plexApi";
+import { useTranslation } from "react-i18next";
 
 interface ButuPlayerProps {
   item: MediaItem;
@@ -57,6 +58,7 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
   const serverType       = useButuStore((s) => s.serverType);
   const settings         = useButuStore((s) => s.settings);
   const progressTimer    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { t } = useTranslation();
 
   // The native Android (ExoBridge) build plays through ExoPlayer, not this <video>, so the
   // burn-and-reload subtitle path only applies to the desktop/webview player.
@@ -342,7 +344,7 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
               resetControlsTimer();
             }}
           >
-            {activeMarker.type === "intro" ? "Skip Intro" : "Skip Credits"}
+            {activeMarker.type === "intro" ? t('player.skip_intro') : t('player.skip_credits')}
             <svg className="ml-2 w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <polyline points="13,6 19,12 13,18" />
               <line x1="19" y1="12" x2="5" y2="12" />
@@ -657,9 +659,9 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
                   onClick={(e) => e.stopPropagation()}
                 >
                   <p className="px-4 pt-2 pb-2 font-mono-tech text-xs tracking-[0.18em]" style={{ color: "rgba(153,247,255,0.6)" }}>
-                    SUBTITLES
+                    {t('player.subtitles_caps')}
                   </p>
-                  {([{ id: null, label: "Off" }, ...subtitleTracks] as { id: string | null; label: string }[]).map((t) => {
+                  {([{ id: null, label: t('player.subtitles_off') }, ...subtitleTracks] as { id: string | null; label: string }[]).map((t) => {
                     const active = selectedSubId === t.id;
                     return (
                       <button

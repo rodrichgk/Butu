@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useButuStore } from "../store/useButuStore";
 import type { MediaItem } from "../types";
+import { useTranslation } from "react-i18next";
 
 interface HeroCarouselProps {
   items: MediaItem[];
@@ -61,6 +62,7 @@ export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
   const setPlayer    = useButuStore((s) => s.setPlayer);
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
   const preloadedRef = useRef(false);
+  const { t } = useTranslation();
 
   // Pre-warm all slide images on first mount — fires once, fills browser cache
   useEffect(() => {
@@ -260,7 +262,7 @@ export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                 <polygon points="5,3 19,12 5,21" />
               </svg>
-              Play Now
+              {t('hero.play_now')}
             </motion.button>
 
             {/* backdropFilter removed — each blur filter is a separate GPU     */}
@@ -292,7 +294,7 @@ export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
                 <line x1="12" y1="8" x2="12" y2="12" />
                 <line x1="12" y1="16" x2="12.01" y2="16" />
               </svg>
-              More Info
+              {t('hero.more_info')}
             </motion.button>
           </div>
         </motion.div>

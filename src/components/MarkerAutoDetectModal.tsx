@@ -26,6 +26,7 @@ import {
   type ShowInput,
 } from "../services/markerDetect";
 import { useButuStore } from "../store/useButuStore";
+import { useTranslation } from "react-i18next";
 
 interface Props { onClose: () => void; }
 
@@ -47,6 +48,7 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
   const jellyfinConfig = useButuStore((s) => s.jellyfinConfig);
   const serverType = useButuStore((s) => s.serverType);
   const library    = useButuStore((s) => s.library);
+  const { t } = useTranslation();
 
   const analyzable = useMemo(
     () => library.filter((i) => i.type === "tv" || i.type === "anime" || i.type === "movie"),
@@ -170,14 +172,14 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
 
   const start = useCallback(async () => {
     if (!serverType || (serverType === "plex" && !plexConfig) || (serverType === "jellyfin" && !jellyfinConfig)) {
-      setError("Server config not loaded — connect to a server first.");
+      setError(t('marker.err_not_loaded'));
       setPhase("error");
       return;
     }
     // The library loads asynchronously after the app mounts; if you open this
     // modal and hit Start before it finishes, there's nothing to analyze yet.
     if (analyzable.length === 0) {
-      setError("Library is still loading — give it a second, then press Start again.");
+      setError(t('marker.err_still_loading'));
       setPhase("error");
       return;
     }
@@ -215,9 +217,7 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
       );
       if (abort.signal.aborted) return;
       if (shows.length === 0) {
-        setError(
-          "Nothing resolved to analyze — none of the selected shows/movies could be matched to a TMDB / TVDB / IMDB id (or nothing was selected).",
-        );
+        setError(t('marker.err_nothing_resolved'));
         setPhase("error");
         return;
       }
@@ -229,7 +229,7 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
       // Keep the technical breakdown in the console for debugging; show a
       // friendly message in the UI.
       console.warn("[marker] couldn't prepare the library:\n" + String(e?.message ?? e));
-      setError("Couldn't prepare the library — make sure your shows have TMDB / TVDB / IMDB ids and try again.");
+      setError(t('marker.err_couldnt_prepare'));
       setPhase("error");
     }
   }, [serverType, plexConfig, jellyfinConfig, library, selectedShows, analyzable, seasonSel, seasonsCache]);
@@ -242,7 +242,7 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
 
   const submit = useCallback(async () => {
     if (!supabaseConfigured) {
-      setError("VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not set — can't submit.");
+      setError(t('marker.err_supabase_not_set'));
       setPhase("error");
       return;
     }
@@ -299,15 +299,13 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
         <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
           <div>
             <p style={{ fontFamily: "ui-monospace, monospace", color: "#99f7ff", fontSize: 11, letterSpacing: "0.15em" }}>
-              COMPANION · MARKER AUTO-DETECT
+              {t('marker.title_caps')}
             </p>
             <h2 style={{ fontSize: 22, fontWeight: 800, marginTop: 6 }}>
-              Detect intros &amp; credits across your library
+              {t('marker.subtitle')}
             </h2>
             <p style={{ color: "#9aa3b4", fontSize: 13, marginTop: 4, maxWidth: 580 }}>
-              Audio-fingerprints the first 15&nbsp;min + last 10&nbsp;min of every TV episode, finds the
-              segment most episodes agree on, and submits the results to the Butu cloud DB so every
-              Butu TV user benefits.
+              {t('marker.description')}
             </p>
           </div>
           <button
@@ -317,23 +315,21 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
               color: "#9aa3b4", borderRadius: 12, padding: "6px 14px", fontSize: 12, cursor: "pointer",
             }}
           >
-            Close
+            {t('marker.close')}
           </button>
         </header>
 
         {!isTauri() && (
           <Banner kind="warn">
-            This page only works in the Butu companion (Tauri) desktop app — Tauri commands aren't
-            available in a plain browser tab.
+            {t('marker.warn_tauri')}
           </Banner>
         )}
         {!serverType && (
-          <Banner kind="warn">Media server isn't connected. Set up Plex or Jellyfin in the main settings first.</Banner>
+          <Banner kind="warn">{t('marker.warn_server')}</Banner>
         )}
         {!supabaseConfigured && (
           <Banner kind="warn">
-            <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> aren't set —
-            analysis will still run, but Submit is disabled.
+            {t('marker.warn_supabase')}
           </Banner>
         )}
         {error && <Banner kind="error">{error}</Banner>}
@@ -342,7 +338,7 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
           {phase === "idle" && (
             <div style={{ padding: "16px 8px", color: "#9aa3b4", display: "flex", flexDirection: "column", gap: 16 }}>
               <p style={{ fontSize: 14 }}>
-                Select the shows and movies you want to analyze.
+                {t('marker.select_instruction')}
               </p>
 
               <div style={{ display: "flex", gap: 8 }}>
@@ -350,13 +346,13 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
                   onClick={() => setSelectedShows(new Set(analyzable.map(s => s.id)))}
                   style={{ ...btnGhost, padding: "6px 12px", fontSize: 12 }}
                 >
-                  Select All
+                  {t('marker.select_all')}
                 </button>
                 <button
                   onClick={() => setSelectedShows(new Set())}
                   style={{ ...btnGhost, padding: "6px 12px", fontSize: 12 }}
                 >
-                  Deselect All
+                  {t('marker.deselect_all')}
                 </button>
               </div>
 
@@ -365,7 +361,7 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
                 borderRadius: 12, padding: 8, display: "flex", flexDirection: "column", gap: 4 
               }}>
                 {analyzable.length === 0 ? (
-                  <div style={{ padding: 12, textAlign: "center", color: "#5a6473" }}>No shows or movies found in library</div>
+                  <div style={{ padding: 12, textAlign: "center", color: "#5a6473" }}>{t('marker.no_shows_found')}</div>
                 ) : (
                   analyzable.map((show) => {
                     const checked = selectedShows.has(show.id);
@@ -392,23 +388,23 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
                           />
                           <span style={{ fontSize: 14, flex: 1, color: checked ? "#e0e6f0" : "#9aa3b4" }}>
                             {show.title}
-                            {subset && <span style={{ color: "#99f7ff", fontSize: 11, marginLeft: 8 }}>· {sel!.size}/{seasons!.length} seasons</span>}
+                            {subset && <span style={{ color: "#99f7ff", fontSize: 11, marginLeft: 8 }}>· {sel!.size}/{seasons!.length} {t('marker.seasons_count', { count: '' }).trim()}</span>}
                           </span>
                           {canExpand && (
                             <button
                               onClick={() => toggleExpand(show)}
                               style={{ ...btnGhost, padding: "3px 8px", fontSize: 11 }}
                             >
-                              {isExpanded ? "▾ seasons" : "▸ seasons"}
+                              {isExpanded ? t('marker.collapse_seasons') : t('marker.expand_seasons')}
                             </button>
                           )}
                         </div>
                         {isExpanded && canExpand && (
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: "6px 12px 8px 40px" }}>
                             {loadingSeasons === show.id ? (
-                              <span style={{ fontSize: 12, color: "#5a6473" }}>loading seasons…</span>
+                              <span style={{ fontSize: 12, color: "#5a6473" }}>{t('marker.loading_seasons')}</span>
                             ) : !seasons || seasons.length === 0 ? (
-                              <span style={{ fontSize: 12, color: "#5a6473" }}>no seasons found</span>
+                              <span style={{ fontSize: 12, color: "#5a6473" }}>{t('marker.no_seasons_found')}</span>
                             ) : (
                               seasons.map((n) => {
                                 const on = (sel ?? new Set(seasons)).has(n);
@@ -437,17 +433,17 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
               </div>
 
               <ul style={{ fontSize: 13, lineHeight: 1.7, listStyle: "none", padding: 0, marginTop: 8 }}>
-                <li>· Audio decode is the slow part — expect ~30 s per episode over a fast LAN connection.</li>
-                <li>· Shows without a TMDB / TVDB / IMDB id are skipped (we can't write them to the keyed DB).</li>
-                <li>· Pre-existing Plex Pass markers aren't affected; this is for users on free Plex / Jellyfin.</li>
+                <li>{t('marker.info_audio_decode')}</li>
+                <li>{t('marker.info_skipped')}</li>
+                <li>{t('marker.info_plex_pass')}</li>
               </ul>
             </div>
           )}
 
           {phase === "preparing" && (
             <Progress
-              title="Preparing library"
-              subtitle={`Fetching show metadata — ${prepareProgress.idx} / ${prepareProgress.total}`}
+              title={t('marker.prep_title')}
+              subtitle={t('marker.prep_subtitle', { idx: prepareProgress.idx, total: prepareProgress.total })}
               detail={prepareProgress.title}
               ratio={prepareProgress.total > 0 ? prepareProgress.idx / prepareProgress.total : 0}
             />
@@ -456,8 +452,8 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
           {(phase === "analyzing" || phase === "finished") && (
             <>
               <Progress
-                title={phase === "finished" ? "Analysis complete" : "Analyzing"}
-                subtitle={`Show ${showProgress.idx + 1} / ${showProgress.total} · ${showProgress.title || "—"} (${Math.round((episodeProgress.current / Math.max(1, episodeProgress.total)) * 100)}%)`}
+                title={phase === "finished" ? t('marker.analysis_complete') : t('marker.analyzing')}
+                subtitle={t('marker.show_progress', { idx: showProgress.idx + 1, total: showProgress.total, title: showProgress.title || "—", percent: Math.round((episodeProgress.current / Math.max(1, episodeProgress.total)) * 100) })}
                 detail={currentEpisode}
                 ratio={episodeProgress.total > 0 ? episodeProgress.current / episodeProgress.total : 0}
               />
@@ -465,13 +461,13 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
               {episodesWithMarkers.length > 0 && (
                 <div style={{ marginTop: 18 }}>
                   <p style={{ fontFamily: "ui-monospace, monospace", color: "#99f7ff", fontSize: 11, letterSpacing: "0.15em", marginBottom: 8 }}>
-                    DETECTED · {episodesWithMarkers.length} EPISODES
+                    {t('marker.detected_caps', { count: episodesWithMarkers.length })}
                   </p>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 70px 100px 100px", gap: "6px 14px", fontSize: 12 }}>
-                    <span style={cellHeader}>Show</span>
-                    <span style={cellHeader}>Episode</span>
-                    <span style={cellHeader}>Intro</span>
-                    <span style={cellHeader}>Credits</span>
+                    <span style={cellHeader}>{t('marker.col_show')}</span>
+                    <span style={cellHeader}>{t('marker.col_episode')}</span>
+                    <span style={cellHeader}>{t('marker.col_intro')}</span>
+                    <span style={cellHeader}>{t('marker.col_credits')}</span>
                     {episodesWithMarkers.slice(-200).map((r, i) => (
                       <div key={i} style={{ display: "contents" }}>
                         <span style={cell}>{r.show_title}</span>
@@ -488,9 +484,7 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
 
           {phase === "submitted" && submitResult && (
             <Banner kind="success">
-              Submitted {submitResult.episodes} episode-marker batches → {submitResult.inserted} rows accepted
-              in the cloud DB. Already-submitted detections are returned as "duplicate" by the function;
-              that's fine.
+              {t('marker.submit_success', { episodes: submitResult.episodes, inserted: submitResult.inserted })}
             </Banner>
           )}
         </section>
@@ -498,48 +492,48 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
         <footer style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
           {phase === "error" && finalCount !== null ? (
             <>
-              <button onClick={onClose} style={btnGhost}>Close</button>
+              <button onClick={onClose} style={btnGhost}>{t('marker.close')}</button>
               <button
                 onClick={submit}
                 disabled={!supabaseConfigured}
                 style={supabaseConfigured ? btnPrimary : btnDisabled}
               >
-                Retry Submission
+                {t('marker.retry_submission')}
               </button>
               <button
                 onClick={start}
                 disabled={!isTauri() || !serverType || selectedShows.size === 0}
                 style={isTauri() && serverType && selectedShows.size > 0 ? btnGhost : btnDisabled}
               >
-                Start new analysis
+                {t('marker.start_new')}
               </button>
             </>
           ) : phase === "idle" || phase === "error" || phase === "submitted" ? (
             <>
-              <button onClick={onClose} style={btnGhost}>Close</button>
+              <button onClick={onClose} style={btnGhost}>{t('marker.close')}</button>
               <button
                 onClick={start}
                 disabled={!isTauri() || !serverType || selectedShows.size === 0}
                 style={isTauri() && serverType && selectedShows.size > 0 ? btnPrimary : btnDisabled}
               >
-                {phase === "submitted" ? "Run again" : `Start analysis (${selectedShows.size})`}
+                {phase === "submitted" ? t('marker.run_again') : t('marker.start_analysis', { count: selectedShows.size })}
               </button>
             </>
           ) : (phase === "preparing" || phase === "analyzing") ? (
-            <button onClick={cancel} style={btnGhost}>Cancel</button>
+            <button onClick={cancel} style={btnGhost}>{t('marker.cancel')}</button>
           ) : phase === "finished" && finalCount !== null ? (
             <>
-              <button onClick={onClose} style={btnGhost}>Close without submitting</button>
+              <button onClick={onClose} style={btnGhost}>{t('marker.close_no_submit')}</button>
               <button
                 onClick={submit}
                 disabled={!supabaseConfigured || finalCount === 0}
                 style={supabaseConfigured && finalCount > 0 ? btnPrimary : btnDisabled}
               >
-                Submit {finalCount} episode{finalCount === 1 ? "" : "s"} to cloud
+                {t('marker.submit_to_cloud', { count: finalCount })}
               </button>
             </>
           ) : (
-            <button disabled style={btnDisabled}>Working…</button>
+            <button disabled style={btnDisabled}>{t('marker.working')}</button>
           )}
         </footer>
       </motion.div>

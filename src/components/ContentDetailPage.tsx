@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { MediaItem, Episode } from "../types";
 import { useButuStore } from "../store/useButuStore";
 import { fetchPlexEpisodes, plexRawToEpisode } from "../services/plexApi";
+import { useTranslation } from "react-i18next";
 
 function fmt(s: number): string {
   const h = Math.floor(s / 3600);
@@ -36,6 +37,7 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
   const [loadedEpisodes, setLoadedEpisodes] = useState<Episode[]>(item.episodes ?? []);
   const [episodesLoading, setEpisodesLoading] = useState(false);
   const playBtnRef = useRef<HTMLButtonElement>(null);
+  const { t } = useTranslation();
 
   // Auto-focus Play button when page opens so remote works immediately
   useEffect(() => {
@@ -163,11 +165,11 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
 
   const resumeLabel = isEpisodic
     ? lastWatched
-      ? `Continue · S${lastWatched.ep.season} E${lastWatched.ep.episode}  ${fmt(lastWatched.time)}`
-      : "Play from S1 E1"
+      ? t('detail.continue_s_e_time', { season: lastWatched.ep.season, episode: lastWatched.ep.episode, time: fmt(lastWatched.time) })
+      : t('detail.play_from_s1_e1')
     : prog
-    ? `Resume · ${fmt(prog.time)}`
-    : "Play";
+    ? t('detail.resume_time', { time: fmt(prog.time) })
+    : t('detail.play');
 
   return (
     <motion.div
@@ -230,7 +232,7 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
             >
               <polyline points="15,18 9,12 15,6" />
             </svg>
-            <span className="font-body text-sm">Back</span>
+            <span className="font-body text-sm">{t('detail.back')}</span>
           </motion.button>
         </div>
 
@@ -302,8 +304,8 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
               {isEpisodic && (
                 <span className="font-mono-tech text-on_surface_variant text-sm">
                   {episodesLoading
-                    ? "Loading episodes…"
-                    : `${seasons.length} Season${seasons.length > 1 ? "s" : ""} · ${episodes.length} Episodes`}
+                    ? t('detail.loading_episodes')
+                    : `${t(seasons.length > 1 ? 'detail.season_count_other' : 'detail.season_count_one', { count: seasons.length })} · ${t('detail.episodes_count', { count: episodes.length })}`}
                 </span>
               )}
               {item.genre?.slice(0, 3).map((g) => (
@@ -457,7 +459,7 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
                       <polyline points="1,4 1,10 7,10" />
                       <path d="M3.51,15a9,9,0,1,0,.49-3.34" />
                     </svg>
-                    Start Over
+                    {t('detail.start_over')}
                   </motion.button>
                 )}
               </motion.div>
@@ -482,7 +484,7 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
                   className="font-mono-tech text-xs"
                   style={{ color: accent }}
                 >
-                  {fmt(prog.time)} / {fmtDur(item.duration)} watched
+                  {fmt(prog.time)} / {fmtDur(item.duration)} {t('detail.watched')}
                 </span>
               </div>
             )}
@@ -494,7 +496,7 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
           <div className="px-20 pb-8">
             <div className="h-px mb-8" style={{ background: "rgba(153,247,255,0.06)" }} />
             <p className="font-mono-tech text-on_surface_variant text-xs animate-pulse">
-              LOADING EPISODES…
+              {t('detail.loading_episodes_caps')}
             </p>
           </div>
         )}
@@ -508,7 +510,7 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
             {/* Season tabs */}
             <div className="flex items-center gap-2 mb-7">
               <span className="font-mono-tech text-on_surface_variant text-xs mr-3">
-                SEASON
+                {t('detail.season_caps')}
               </span>
               {seasons.map((s) => (
                 <motion.button
@@ -641,7 +643,7 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
                                 color: accent,
                               }}
                             >
-                              Watching
+                              {t('detail.watching')}
                             </span>
                           )}
                         </div>

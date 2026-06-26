@@ -60,6 +60,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.tv.material3.Text
 import dev.butu.navigation.Section
 import dev.butu.ui.theme.ButuColors
@@ -248,7 +249,7 @@ private fun NavItem(
             exit = fadeOut(tween(200)) + slideOutHorizontally(tween(200)) { -6 },
         ) {
             Text(
-                text = section.label,
+                text = stringResource(section.labelRes),
                 color = if (isActive) ButuColors.NeonAura else ButuColors.OnSurface.copy(alpha = 0.50f),
                 style = ButuType.BodyMd.copy(
                     fontSize = 13.sp,
