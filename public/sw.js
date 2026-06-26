@@ -1,5 +1,5 @@
 // Service Worker for offline-first architecture and intelligent caching
-const CACHE_VERSION = 'butu-v2';
+const CACHE_VERSION = 'butu-v3';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 const IMAGE_CACHE = `${CACHE_VERSION}-images`;

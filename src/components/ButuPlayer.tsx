@@ -11,6 +11,7 @@ import {
 import { fetchCloudMarkers, CloudMarker } from "../services/markerService";
 import { fetchPlexSubtitleTracks, applyPlexSubtitle, type PlexSubtitleTrack } from "../services/plexApi";
 import { useTranslation } from "react-i18next";
+import { isTouch } from "../utils/platform";
 
 interface ButuPlayerProps {
   item: MediaItem;
@@ -142,11 +143,12 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
     resetControlsTimer();
   }, [setPlayer, resetControlsTimer]);
 
-  const handleSeekClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!seekBarRef.current || !videoRef.current) return;
+  // Maps a pointer/touch X coordinate to a seek. Shared by mouse click and touch drag.
+  const seekFromClientX = useCallback(
+    (clientX: number) => {
+      if (!seekBarRef.current || !videoRef.current || !duration) return;
       const rect = seekBarRef.current.getBoundingClientRect();
-      const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
       const newTime = ratio * duration;
       videoRef.current.currentTime = newTime;
       setCurrentTime(newTime);
@@ -154,6 +156,21 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
     },
     [duration, resetControlsTimer]
   );
+
+  const handleSeekClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => seekFromClientX(e.clientX),
+    [seekFromClientX]
+  );
+
+  // On touch, tapping the video surface toggles the controls (not play/pause).
+  const handleSurfaceTap = useCallback(() => {
+    if (showControls) {
+      setShowControls(false);
+      if (controlsTimer.current) clearTimeout(controlsTimer.current);
+    } else {
+      resetControlsTimer();
+    }
+  }, [showControls, resetControlsTimer]);
 
   const handleVolumeChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -301,7 +318,7 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
       onMouseMove={resetControlsTimer}
-      onClick={togglePlay}
+      onClick={isTouch ? handleSurfaceTap : togglePlay}
     >
       <div
         className="absolute inset-0 pointer-events-none"
@@ -315,14 +332,16 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
         src={subUrl ?? item.streamUrl ?? item.url}
         className="w-full h-full object-contain"
         playsInline
-        onClick={(e) => e.stopPropagation()}
+        // Desktop: swallow the click so it doesn't reach the surface toggle. Touch:
+        // let it bubble so a tap on the video reveals/hides the controls.
+        onClick={(e) => { if (!isTouch) e.stopPropagation(); }}
         style={{ zIndex: 1 }}
       />
 
       <AnimatePresence>
         {activeMarker && (
           <motion.button
-            className="absolute bottom-32 right-16 z-20 flex items-center justify-center px-6 py-3 rounded-full font-display font-bold text-lg"
+            className="absolute bottom-24 right-4 md:bottom-32 md:right-16 z-20 flex items-center justify-center px-5 py-2.5 md:px-6 md:py-3 rounded-full font-display font-bold text-base md:text-lg"
             initial={{ opacity: 0, scale: 0.9, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 10 }}
@@ -361,7 +380,14 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              // Touch: a tap on the empty backdrop (not a control) hides the overlay.
+              if (isTouch && e.target === e.currentTarget) {
+                setShowControls(false);
+                if (controlsTimer.current) clearTimeout(controlsTimer.current);
+              }
+            }}
           >
             <div
               className="absolute inset-0 pointer-events-none"
@@ -371,7 +397,7 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
               }}
             />
 
-            <div className="relative flex items-center justify-between px-16 pt-10">
+            <div className="relative flex items-center justify-between px-4 md:px-16 pt-6 md:pt-10">
               <div className="flex items-center gap-4">
                 <motion.button
                   data-magnetic
@@ -398,7 +424,7 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
                 </motion.button>
 
                 <div>
-                  <h2 className="font-display font-bold text-white text-xl leading-tight">
+                  <h2 className="font-display font-bold text-white text-base md:text-xl leading-tight">
                     {item.title}
                   </h2>
                   {item.artist && (
@@ -410,16 +436,27 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
 
             </div>
 
-            <div className="mt-auto relative px-16 pb-12">
+            <div className="mt-auto relative px-4 md:px-16 pb-6 md:pb-12">
               <div className="mb-6">
                 <div
-                  ref={seekBarRef}
-                  className="seek-bar-glass w-full h-1.5 rounded-full cursor-none relative overflow-visible"
+                  className="relative"
                   onClick={handleSeekClick}
                   onMouseDown={() => setIsDraggingSeek(true)}
                   onMouseUp={() => setIsDraggingSeek(false)}
-                  style={{ cursor: "none" }}
+                  onTouchStart={(e) => { setIsDraggingSeek(true); seekFromClientX(e.touches[0].clientX); }}
+                  onTouchMove={(e) => seekFromClientX(e.touches[0].clientX)}
+                  onTouchEnd={() => setIsDraggingSeek(false)}
+                  style={{
+                    // Bigger finger target + no page-pan hijack while scrubbing on touch.
+                    padding: isTouch ? "14px 0" : undefined,
+                    touchAction: isTouch ? "none" : undefined,
+                    cursor: isTouch ? "pointer" : "none",
+                  }}
                 >
+                  <div
+                    ref={seekBarRef}
+                    className="seek-bar-glass w-full h-1.5 rounded-full relative overflow-visible"
+                  >
                   <div
                     className="absolute left-0 top-0 h-full rounded-full"
                     style={{
@@ -436,15 +473,19 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
                     }}
                   />
                   <div
-                    className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full"
+                    className="absolute top-1/2 -translate-y-1/2 rounded-full"
                     style={{
-                      left: `calc(${progress * 100}% - 8px)`,
+                      width: isTouch ? 18 : 16,
+                      height: isTouch ? 18 : 16,
+                      left: `calc(${progress * 100}% - ${isTouch ? 9 : 8}px)`,
                       background: "#99f7ff",
                       boxShadow: `0 0 16px 4px ${ambientColor}80`,
-                      opacity: isDraggingSeek || showControls ? 1 : 0,
+                      // Always show the thumb on touch — there's no hover to hint at scrubbing.
+                      opacity: isDraggingSeek || showControls || isTouch ? 1 : 0,
                       transition: "opacity 0.2s",
                     }}
                   />
+                  </div>
                 </div>
 
                 <div className="flex justify-between mt-2">
@@ -457,8 +498,9 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              <div className="grid grid-cols-3 items-center gap-2">
+                <div className="flex items-center gap-3 justify-self-start">
+                  {!isTouch && (<>
                   <motion.button
                     data-magnetic
                     data-magnetic-id="player-mute"
@@ -504,9 +546,10 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
                     className="w-24 accent-primary cursor-none"
                     style={{ accentColor: "#99f7ff" }}
                   />
+                  </>)}
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 md:gap-4 justify-self-center">
                   <motion.button
                     data-magnetic
                     data-magnetic-id="player-rewind"
@@ -581,8 +624,8 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
                   </motion.button>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  {item.bitrate && (
+                <div className="flex items-center gap-2 md:gap-3 justify-self-end">
+                  {item.bitrate && !isTouch && (
                     <span className="font-mono-tech text-on_surface_variant text-xs">
                       {item.bitrate}
                     </span>
@@ -613,10 +656,14 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
                     data-magnetic
                     data-magnetic-id="player-fullscreen"
                     onClick={() => {
+                      const vid = videoRef.current as any;
                       if (document.fullscreenElement) {
                         document.exitFullscreen();
-                      } else {
-                        document.documentElement.requestFullscreen();
+                      } else if (document.fullscreenEnabled) {
+                        document.documentElement.requestFullscreen?.();
+                      } else if (vid?.webkitEnterFullscreen) {
+                        // iOS Safari only allows the <video> element itself to go fullscreen.
+                        vid.webkitEnterFullscreen();
                       }
                       resetControlsTimer();
                     }}
@@ -646,7 +693,7 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
                 <motion.div
                   className="absolute z-30 rounded-2xl overflow-hidden py-1"
                   style={{
-                    right: 64, bottom: 128, minWidth: 240, maxHeight: 320, overflowY: "auto",
+                    right: isTouch ? 12 : 64, bottom: isTouch ? 92 : 128, minWidth: 220, maxWidth: "calc(100vw - 24px)", maxHeight: 320, overflowY: "auto",
                     background: "rgba(8,10,18,0.96)",
                     border: "1px solid rgba(153,247,255,0.15)",
                     backdropFilter: "blur(16px)",
