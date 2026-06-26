@@ -28,6 +28,6 @@ interface SupabaseMarkerApi {
         @Url url: String,
         @HeaderMap headers: Map<String, String>,
         @QueryMap filters: Map<String, String>,
-        @Query("select") select: String = "marker_type,start_ms,end_ms",
+        @Query("select") select: String = "marker_type,start_ms,end_ms,submitted_by",
     ): List<SupabaseMarkerDto>
 }

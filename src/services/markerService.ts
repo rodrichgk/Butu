@@ -46,7 +46,7 @@ export async function fetchCloudMarkers(item: MediaItem, ep?: Episode): Promise<
 
   try {
     const url = new URL(`${SUPABASE_URL.replace(/\/$/, "")}/rest/v1/markers`);
-    url.searchParams.set("select", "marker_type,start_ms,end_ms");
+    url.searchParams.set("select", "marker_type,start_ms,end_ms,submitted_by");
     url.searchParams.set("provider", `eq.${provider}`);
     url.searchParams.set("provider_id", `eq.${providerId}`);
     url.searchParams.set("season", `eq.${season}`);
@@ -65,11 +65,21 @@ export async function fetchCloudMarkers(item: MediaItem, ep?: Episode): Promise<
     }
 
     const rows = await res.json();
-    return rows.map((row: any) => ({
-      type: row.marker_type,
-      startMs: row.start_ms,
-      endMs: row.end_ms
-    }));
+    // The cloud DB carries bulk "seed" placeholder markers (flat, eyeballed times
+    // duplicated across a season) alongside accurate per-episode markers. Once a
+    // real marker exists for a type the seed is noise — e.g. a flat 50:00 credits
+    // seed fires "Up Next" minutes early on a 58:53 episode. So for each type, drop
+    // the seed rows when a non-seed of that type is present (seed-only stays).
+    const typesWithReal = new Set(
+      rows.filter((r: any) => r.submitted_by !== "seed").map((r: any) => r.marker_type)
+    );
+    return rows
+      .filter((r: any) => !(r.submitted_by === "seed" && typesWithReal.has(r.marker_type)))
+      .map((row: any) => ({
+        type: row.marker_type,
+        startMs: row.start_ms,
+        endMs: row.end_ms
+      }));
   } catch (err) {
     console.error("fetchCloudMarkers threw error", err);
     return [];

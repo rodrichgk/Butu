@@ -79,8 +79,27 @@ class CloudMarkerSource @Inject constructor(
             headers = supabaseHeaders(),
             filters = filters,
         )
-        return rows.mapNotNull { it.toDomain() }
+        return preferReal(rows).mapNotNull { it.toDomain() }
     }
+
+    /**
+     * The cloud DB carries bulk "seed" placeholder markers (flat, eyeballed
+     * times duplicated across a whole season) alongside accurate per-episode
+     * markers (auto-detected / user-submitted). Once a real marker exists for a
+     * type the seed is pure noise — e.g. a flat 50:00 credits seed fires the
+     * "Up Next" overlay minutes early on a 58:53 episode. So for each marker
+     * type, drop the seed rows whenever a non-seed row of that type is present.
+     * Seed-only coverage (a show with no real markers yet) is left untouched.
+     */
+    private fun preferReal(rows: List<SupabaseMarkerDto>): List<SupabaseMarkerDto> {
+        val typesWithReal = rows.filterNot { it.isSeed }
+            .map { it.markerType.lowercase() }
+            .toSet()
+        return rows.filterNot { it.isSeed && it.markerType.lowercase() in typesWithReal }
+    }
+
+    private val SupabaseMarkerDto.isSeed: Boolean
+        get() = submittedBy?.equals("seed", ignoreCase = true) == true
 
     private fun supabaseHeaders(): Map<String, String> = mapOf(
         "apikey"        to BuildConfig.SUPABASE_ANON_KEY,
