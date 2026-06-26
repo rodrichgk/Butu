@@ -56,10 +56,11 @@
     ],
     "platforms": [
       { "name": "Web", "note": "You're on it — just connect" },
-      { "name": "Windows", "note": "Desktop app — coming soon" },
-      { "name": "Android TV", "note": "APK — coming soon" }
+      { "name": "Windows", "note": "Desktop installer", "url": "https://github.com/rodrichgk/Butu/releases" },
+      { "name": "Android TV", "note": "Sideload the APK", "url": "https://github.com/rodrichgk/Butu/releases" }
     ],
     "use_it_now": "Use it now",
+    "download": "Download",
     "coming_soon": "Coming soon",
     "faq": [
       { "q": "Do I need my own server?", "a": "Yes. Butu plays your existing Plex or Jellyfin library — it doesn't host or provide any content itself." },

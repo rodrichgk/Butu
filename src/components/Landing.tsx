@@ -114,6 +114,11 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
                       style={{ background: "rgba(153,247,255,0.12)", color: "#99f7ff", border: "1px solid rgba(153,247,255,0.3)", cursor: "pointer" }}>
                       {t('landing.use_it_now')}
                     </button>
+                  ) : p.url ? (
+                    <a href={p.url} target="_blank" rel="noreferrer" className="font-display font-semibold inline-block mt-4 px-5 py-2 rounded-xl"
+                      style={{ background: "rgba(153,247,255,0.12)", color: "#99f7ff", border: "1px solid rgba(153,247,255,0.3)", cursor: "pointer", textDecoration: "none" }}>
+                      {t('landing.download')}
+                    </a>
                   ) : (
                     <span className="font-mono-tech inline-block mt-4 px-3 py-1.5 rounded-lg text-xs tracking-wider uppercase"
                       style={{ color: "rgba(224,230,240,0.4)", border: "1px solid rgba(255,255,255,0.08)" }}>

@@ -56,10 +56,11 @@
     ],
     "platforms": [
       { "name": "Web", "note": "Vous y êtes — connectez-vous" },
-      { "name": "Windows", "note": "Application de bureau — à venir" },
-      { "name": "Android TV", "note": "APK — à venir" }
+      { "name": "Windows", "note": "Installateur de bureau", "url": "https://github.com/rodrichgk/Butu/releases" },
+      { "name": "Android TV", "note": "Installer l'APK", "url": "https://github.com/rodrichgk/Butu/releases" }
     ],
     "use_it_now": "Utiliser maintenant",
+    "download": "Télécharger",
     "coming_soon": "À venir",
     "faq": [
       { "q": "Dois-je avoir mon propre serveur ?", "a": "Oui. Butu lit votre bibliothèque Plex ou Jellyfin — l'appli ne fournit ni n'héberge aucun contenu." },
