@@ -189,6 +189,10 @@
 @media (hover: none), (pointer: coarse) {
   *, *::before, *::after { cursor: auto !important; }
   a, button, [role="button"], .focusable { cursor: pointer !important; }
+  /* Text fields should still show a caret/text cursor. */
+  input, textarea { cursor: text !important; }
+  /* Native-feeling taps: kill the grey/blue flash on every interactive element. */
+  *, *::before, *::after { -webkit-tap-highlight-color: transparent; }
   /* MediaCard info bar is opacity-0 until group-hover/focus — show it always. */
   .card-info { opacity: 1 !important; transform: none !important; }
   /* ...and darken the scrim enough that the always-on title stays legible. */

@@ -23,7 +23,8 @@ export function MobileNav() {
         zIndex: 45,
         display: "flex",
         alignItems: "stretch",
-        height: MOBILE_NAV_HEIGHT,
+        // Grow by the bottom inset so the home-indicator area doesn't squish the icons.
+        height: `calc(${MOBILE_NAV_HEIGHT}px + env(safe-area-inset-bottom))`,
         paddingBottom: "env(safe-area-inset-bottom)",
         background: "rgba(8,10,15,0.94)",
         backdropFilter: "blur(18px)",

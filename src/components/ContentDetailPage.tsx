@@ -204,7 +204,7 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
       {/* ── Content ──────────────────────────────────── */}
       <div className="relative" style={{ zIndex: 1 }}>
         {/* Back bar */}
-        <div className="px-4 md:px-20 pt-8 pb-2">
+        <div className="px-4 sm:px-8 lg:px-20 pt-8 pb-2">
           <motion.button
             onClick={onClose}
             className="focusable flex items-center gap-2"
@@ -237,12 +237,11 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
         </div>
 
         {/* Hero */}
-        <div className="px-4 md:px-20 pt-6 pb-12 flex flex-col md:flex-row gap-6 md:gap-10 items-start">
+        <div className="px-4 sm:px-8 lg:px-20 pt-6 pb-12 flex flex-col md:flex-row gap-6 md:gap-10 items-start">
           {/* Poster */}
           <motion.div
-            className="flex-shrink-0 rounded-2xl overflow-hidden"
+            className="flex-shrink-0 overflow-hidden rounded-[18px] md:rounded-2xl w-36 sm:w-44 md:w-[200px] mx-auto sm:mx-0"
             style={{
-              width: 200,
               boxShadow: `0 0 48px 8px ${accent}22, 0 24px 64px rgba(0,0,0,0.8)`,
             }}
             initial={{ opacity: 0, scale: 0.93 }}
@@ -382,14 +381,14 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
             {/* Action buttons */}
             {item.type !== "manga" && (
               <motion.div
-                className="flex items-center gap-4 flex-wrap"
+                className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.27 }}
               >
                 <motion.button
                   ref={playBtnRef}
-                  className="focusable flex items-center gap-3 px-8 py-4 rounded-2xl font-display font-bold text-base"
+                  className="focusable w-full sm:w-auto justify-center flex items-center gap-3 px-8 py-4 rounded-2xl font-display font-bold text-base"
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
@@ -423,7 +422,7 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
 
                 {canResume && (
                   <motion.button
-                    className="focusable flex items-center gap-2 px-6 py-4 rounded-2xl font-body text-sm"
+                    className="focusable w-full sm:w-auto justify-center flex items-center gap-2 px-6 py-4 rounded-2xl font-body text-sm"
                     tabIndex={0}
                     data-magnetic
                     data-magnetic-id="detail-restart"
@@ -496,7 +495,7 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
 
         {/* ── Episodes ──────────────────────────────── */}
         {episodesLoading && (
-          <div className="px-4 md:px-20 pb-8">
+          <div className="px-4 sm:px-8 lg:px-20 pb-8">
             <div className="h-px mb-8" style={{ background: "rgba(153,247,255,0.06)" }} />
             <p className="font-mono-tech text-on_surface_variant text-xs animate-pulse">
               {t('detail.loading_episodes_caps')}
@@ -504,14 +503,14 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
           </div>
         )}
         {isEpisodic && !episodesLoading && (
-          <div className="px-4 md:px-20 pb-24">
+          <div className="px-4 sm:px-8 lg:px-20 pb-24">
             <div
               className="h-px mb-8"
               style={{ background: "rgba(153,247,255,0.06)" }}
             />
 
             {/* Season tabs */}
-            <div className="flex items-center gap-2 mb-7">
+            <div className="flex flex-wrap items-center gap-2 mb-7">
               <span className="font-mono-tech text-on_surface_variant text-xs mr-3">
                 {t('detail.season_caps')}
               </span>

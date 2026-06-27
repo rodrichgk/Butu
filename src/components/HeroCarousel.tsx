@@ -180,10 +180,10 @@ export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
           animate="center"
           exit="exit"
           transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
-          className="absolute bottom-0 left-0 pb-8 md:pb-16 pl-4 md:pl-20 pr-4 md:pr-12 max-w-3xl"
+          className="absolute bottom-0 left-0 right-0 pb-7 lg:pb-16 pl-4 sm:pl-8 lg:pl-20 pr-4 sm:pr-8 lg:pr-12 max-w-3xl"
           style={{ willChange: "transform, opacity" }}
         >
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-3 mb-2 sm:mb-4">
             {current.genre?.slice(0, 2).map((g) => (
               <span
                 key={g}
@@ -200,13 +200,13 @@ export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
           </div>
 
           <h1
-            className="font-display font-black leading-none mb-4"
-            style={{ fontSize: "clamp(2.5rem, 5vw, 4.5rem)", color: "#ffffff" }}
+            className="font-display font-black leading-none mb-2 sm:mb-4"
+            style={{ fontSize: "clamp(1.9rem, 5vw, 4.5rem)", color: "#ffffff" }}
           >
             {current.title}
           </h1>
 
-          <div className="flex items-center gap-5 mb-5">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-3 sm:mb-5">
             {current.rating   && <StarRating rating={current.rating} />}
             {current.year     && (
               <span className="font-mono-tech text-on_surface_variant text-sm">
@@ -228,11 +228,11 @@ export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
             )}
           </div>
 
-          <p className="font-body text-on_surface_variant text-lg leading-relaxed mb-8 max-w-xl line-clamp-2">
+          <p className="hidden sm:block font-body text-on_surface_variant text-base lg:text-lg leading-relaxed mb-6 lg:mb-8 max-w-xl line-clamp-2">
             {current.description}
           </p>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <motion.button
               data-magnetic
               data-magnetic-id={`hero-play-${current.id}`}
@@ -248,7 +248,7 @@ export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
                 setPlayer({ currentMedia: current, isPlaying: true });
                 onSelect(current);
               }}
-              className="group relative px-8 py-3.5 rounded-full overflow-hidden focusable"
+              className="group relative flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 rounded-full overflow-hidden focusable"
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               whileFocus={{ scale: 1.05 }}
@@ -270,7 +270,7 @@ export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
             <motion.button
               data-magnetic
               data-magnetic-id={`hero-info-${current.id}`}
-              className="focusable flex items-center gap-3 px-8 py-4 rounded-full font-display font-bold text-base"
+              className="focusable flex-1 sm:flex-none flex items-center justify-center gap-3 px-6 sm:px-8 py-3.5 sm:py-4 rounded-full font-display font-bold text-base"
               tabIndex={0}
               onClick={() => onSelect(current)}
               onKeyDown={(e) => {
@@ -301,7 +301,7 @@ export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
       </AnimatePresence>
 
       {/* ── Slide indicators ──────────────────────────────────────────────── */}
-      <div className="absolute bottom-8 right-20 flex items-center gap-2">
+      <div className="absolute top-4 right-4 lg:top-auto lg:bottom-8 lg:right-20 flex items-center gap-2">
         {items.map((_, i) => (
           <button
             key={i}
