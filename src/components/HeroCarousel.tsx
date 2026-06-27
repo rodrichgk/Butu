@@ -200,8 +200,13 @@ export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
           </div>
 
           <h1
-            className="font-display font-black leading-none mb-2 sm:mb-4"
-            style={{ fontSize: "clamp(1.9rem, 5vw, 4.5rem)", color: "#ffffff" }}
+            className="font-display font-black leading-[1.04] mb-2 sm:mb-3 line-clamp-2"
+            style={{
+              fontSize: "clamp(1.75rem, 4.2vw, 3.5rem)",
+              color: "#ffffff",
+              // Keep the title legible over bright backdrops without an extra paint layer.
+              textShadow: "0 2px 24px rgba(0,0,0,0.6)",
+            }}
           >
             {current.title}
           </h1>
@@ -228,7 +233,7 @@ export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
             )}
           </div>
 
-          <p className="hidden sm:block font-body text-on_surface_variant text-base lg:text-lg leading-relaxed mb-6 lg:mb-8 max-w-xl line-clamp-2">
+          <p className="hidden sm:block font-body text-on_surface_variant text-sm lg:text-base leading-relaxed mb-4 lg:mb-6 max-w-xl line-clamp-2">
             {current.description}
           </p>
 
@@ -248,13 +253,15 @@ export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
                 setPlayer({ currentMedia: current, isPlaying: true });
                 onSelect(current);
               }}
-              className="group relative flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 rounded-full overflow-hidden focusable"
+              className="group relative flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 rounded-full overflow-hidden focusable font-display font-bold text-base"
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               whileFocus={{ scale: 1.05 }}
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
               style={{
                 background: "linear-gradient(135deg, #99f7ff 0%, #00f1fe 100%)",
+                // Dark text on the cyan fill — white was unreadable (same dark-on-cyan as the logo).
+                color: "#00131a",
                 boxShadow: "0 8px 24px rgba(153,247,255,0.25), 0 0 0 1px rgba(255,255,255,0.1)",
                 cursor: "none",
               }}
