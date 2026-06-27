@@ -1,5 +1,5 @@
 // Service Worker for offline-first architecture and intelligent caching
-const CACHE_VERSION = 'butu-v3';
+const CACHE_VERSION = 'butu-v4';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 const IMAGE_CACHE = `${CACHE_VERSION}-images`;
@@ -67,7 +67,10 @@ self.addEventListener('fetch', (event) => {
     url.pathname.includes('.m4s')   // fMP4 segments used by Plex directStream
   ) {
     event.respondWith(videoStrategy(request));
-  } else if (url.pathname.startsWith('/api/')) {
+  } else if (url.hostname.endsWith('.plex.direct') || url.pathname.startsWith('/api/')) {
+    // Plex API (identity / library / children…) — go to the live server first so a
+    // freshly-fixed connection shows real data instead of a stale cached library that
+    // masks a broken connection. Falls back to cache only when the network fails.
     event.respondWith(networkFirstStrategy(request));
   } else {
     event.respondWith(cacheFirstStrategy(request));

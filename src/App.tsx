@@ -1,8 +1,8 @@
-import { useState, useCallback, useEffect, useRef, useMemo, type ReactNode } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo, type ReactNode, type CSSProperties } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import { LiquidCursor } from "./components/LiquidCursor";
-import { NavigationSidebar } from "./components/NavigationSidebar";
+import { NavigationSidebar, CATEGORY_IDS, CATEGORY_ITEMS } from "./components/NavigationSidebar";
 import { HeroCarousel } from "./components/HeroCarousel";
 import { MediaStage } from "./components/MediaStage";
 import { MobileNav, MOBILE_NAV_HEIGHT } from "./components/MobileNav";
@@ -34,6 +34,7 @@ import {
 } from "./services/plexApi";
 import type { MediaItem, WatchProgressEntry } from "./types";
 import { isAndroid } from "./utils/platform";
+import { describeServerError } from "./utils/errorMessages";
 import { preloader } from "./utils/predictivePreloader";
 import { swManager } from "./utils/serviceWorkerManager";
 import { metadataCache } from "./utils/metadataCache";
@@ -307,7 +308,7 @@ export default function App() {
         return;
       }
       if (activeSection !== "home") {
-        setActiveSection("home");
+        setActiveSection(isTouchLayout && CATEGORY_IDS.includes(activeSection) ? "browse" : "home");
         return;
       }
       setShowExitDialog(true);
@@ -317,7 +318,7 @@ export default function App() {
 
     window.addEventListener("popstate", handleBack);
     return () => window.removeEventListener("popstate", handleBack);
-  }, [playerMedia, selectedMedia, activeSection, setActiveSection, handleClosePlayer]);
+  }, [playerMedia, selectedMedia, activeSection, setActiveSection, handleClosePlayer, isTouchLayout]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -325,7 +326,7 @@ export default function App() {
         e.preventDefault();
         if (playerMedia) { handleClosePlayer(); return; }
         if (selectedMedia) { setSelectedMedia(null); return; }
-        if (activeSection !== "home") { setActiveSection("home"); return; }
+        if (activeSection !== "home") { setActiveSection(isTouchLayout && CATEGORY_IDS.includes(activeSection) ? "browse" : "home"); return; }
         setShowExitDialog(true);
         if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
         exitTimerRef.current = setTimeout(() => setShowExitDialog(false), 4000);
@@ -333,7 +334,7 @@ export default function App() {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [playerMedia, selectedMedia, activeSection, setActiveSection, handleClosePlayer]);
+  }, [playerMedia, selectedMedia, activeSection, setActiveSection, handleClosePlayer, isTouchLayout]);
 
   useEffect(() => {
     if (!serverType) return;
@@ -364,7 +365,7 @@ export default function App() {
           if (!cancelled) setLibrary(allMedia);
         }
       } catch (e) {
-        if (!cancelled) setJellyfinError((e as Error).message);
+        if (!cancelled) setJellyfinError(describeServerError(e, serverType));
       } finally {
         if (!cancelled) setJellyfinLoading(false);
       }
@@ -417,11 +418,11 @@ export default function App() {
     const handleBack = () => {
       if (playerMedia) { handleClosePlayer(); return; }
       if (selectedMedia) { setSelectedMedia(null); return; }
-      if (activeSection !== "home") { setActiveSection("home"); return; }
+      if (activeSection !== "home") { setActiveSection(isTouchLayout && CATEGORY_IDS.includes(activeSection) ? "browse" : "home"); return; }
     };
     window.addEventListener("spatial-back", handleBack);
     return () => window.removeEventListener("spatial-back", handleBack);
-  }, [playerMedia, selectedMedia, activeSection, setActiveSection, handleClosePlayer]);
+  }, [playerMedia, selectedMedia, activeSection, setActiveSection, handleClosePlayer, isTouchLayout]);
 
   const { movies, music, tv, anime, manga, source, continueWatching, featured } = useFilteredLibrary();
 
@@ -468,6 +469,7 @@ export default function App() {
         >
         {/* Sticky app bar (touch only) — sits in normal flow so content starts below it */}
         {isTouchLayout && <MobileTopBar />}
+        <ConnectionErrorBanner />
         {activeSection === "home" && settings.showHero && featured.length > 0 && (
           <div className="relative h-[42vh] min-h-[300px] lg:h-[55vh] lg:min-h-[480px] mb-6 lg:mb-12 flex-shrink-0">
             <HeroCarousel items={featured} onSelect={handleItemSelect} />
@@ -604,6 +606,10 @@ export default function App() {
             </div>
           )}
 
+          {activeSection === "browse" && (
+            <BrowseView />
+          )}
+
           {activeSection === "search" && (
             <SearchView onSelect={handleItemSelect} />
           )}
@@ -719,14 +725,28 @@ export default function App() {
 function HomeStatus() {
   const loading = useButuStore((s) => s.jellyfinLoading);
   const error   = useButuStore((s) => s.jellyfinError);
+  const refresh = useButuStore((s) => s.refreshLibrary);
+  const setActiveSection = useButuStore((s) => s.setActiveSection);
   return (
-    <div className="px-4 sm:px-8 lg:px-20 py-24 flex flex-col items-center text-center gap-2">
+    <div className="px-4 sm:px-8 lg:px-20 py-24 flex flex-col items-center text-center gap-3">
       {loading ? (
         <p className="font-mono-tech text-on_surface_variant text-sm animate-pulse">
           Loading your library…
         </p>
       ) : error ? (
-        <p className="font-mono-tech text-sm" style={{ color: "#ff6b6b" }}>⚠ {error}</p>
+        <>
+          <div style={{ fontSize: 30, lineHeight: 1 }}>⚠️</div>
+          <p className="font-display font-semibold" style={{ fontSize: 17, color: "#ff8c8c" }}>
+            Couldn't load your library
+          </p>
+          <p className="font-body text-on_surface_variant text-sm" style={{ maxWidth: 440, lineHeight: 1.55 }}>
+            {error}
+          </p>
+          <div className="flex items-center gap-2 mt-2">
+            <button onClick={() => refresh()} className="focusable" style={errorBtnPrimary}>Retry</button>
+            <button onClick={() => setActiveSection("settings")} className="focusable" style={errorBtnGhost}>Settings</button>
+          </div>
+        </>
       ) : (
         <>
           <p className="font-display font-semibold text-on_surface" style={{ fontSize: 18 }}>
@@ -737,6 +757,116 @@ function HomeStatus() {
           </p>
         </>
       )}
+    </div>
+  );
+}
+
+const errorBtnPrimary: CSSProperties = {
+  padding: "8px 18px", borderRadius: 12, fontSize: 13, fontWeight: 600,
+  background: "rgba(153,247,255,0.14)", color: "#99f7ff",
+  border: "1px solid rgba(153,247,255,0.32)",
+};
+const errorBtnGhost: CSSProperties = {
+  padding: "8px 16px", borderRadius: 12, fontSize: 13, fontWeight: 600,
+  background: "rgba(255,255,255,0.04)", color: "rgba(224,230,240,0.7)",
+  border: "1px solid rgba(255,255,255,0.10)",
+};
+
+/**
+ * Top-of-content banner shown when a library refresh fails *while content is
+ * already on screen* (stale data) — the empty-library case is covered by
+ * HomeStatus. Either way the user sees the problem without opening the console.
+ */
+function ConnectionErrorBanner() {
+  const error   = useButuStore((s) => s.jellyfinError);
+  const loading = useButuStore((s) => s.jellyfinLoading);
+  const hasData = useButuStore((s) => s.library.length > 0);
+  const refresh = useButuStore((s) => s.refreshLibrary);
+  const [dismissed, setDismissed] = useState(false);
+  // A new/changed error re-shows the banner even if previously dismissed.
+  useEffect(() => { setDismissed(false); }, [error]);
+
+  if (!error || loading || dismissed || !hasData) return null;
+  return (
+    <div
+      role="alert"
+      className="mx-4 sm:mx-8 lg:mx-20 mt-4 mb-2 flex items-start gap-3 rounded-2xl p-4"
+      style={{ background: "rgba(255,90,90,0.10)", border: "1px solid rgba(255,90,90,0.30)" }}
+    >
+      <span style={{ fontSize: 18, lineHeight: 1.2 }}>⚠️</span>
+      <div className="flex-1 min-w-0">
+        <p className="font-display font-semibold" style={{ color: "#ff8c8c", fontSize: 14 }}>
+          Connection problem — showing what loaded earlier
+        </p>
+        <p className="font-body text-on_surface_variant" style={{ fontSize: 13, lineHeight: 1.5, marginTop: 2 }}>
+          {error}
+        </p>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <button onClick={() => refresh()} className="focusable" style={errorBtnPrimary}>Retry</button>
+        <button onClick={() => setDismissed(true)} className="focusable" aria-label="Dismiss"
+          style={{ ...errorBtnGhost, padding: "8px 12px" }}>✕</button>
+      </div>
+    </div>
+  );
+}
+
+// Maps a Browse category id to the MediaItem.type it groups.
+const BROWSE_TYPE: Record<string, string> = {
+  movies: "movie", tv: "tv", anime: "anime", manga: "manga", music: "music",
+};
+
+// Browse is a real destination (Apple Music "Library" pattern): a grid of the
+// content categories you drill into — never a tab that opens a sheet.
+function BrowseView() {
+  const { t } = useTranslation();
+  const setActiveSection = useButuStore((s) => s.setActiveSection);
+  const library          = useButuStore((s) => s.library);
+
+  const countFor = (id: string) => library.filter((i) => i.type === BROWSE_TYPE[id]).length;
+  // Don't surface empty categories as dead-ends — but if nothing has loaded yet,
+  // fall back to showing all so the page is never blank.
+  const nonEmpty = CATEGORY_ITEMS.filter((c) => countFor(c.id) > 0);
+  const shown = nonEmpty.length ? nonEmpty : CATEGORY_ITEMS;
+
+  return (
+    <div className="px-4 sm:px-8 lg:px-20 pt-10">
+      <h1 className="font-display font-black text-on_surface mb-8" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
+        {t("nav.browse")}
+      </h1>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4" style={{ maxWidth: 900 }}>
+        {shown.map((item) => {
+          const count = countFor(item.id);
+          const Icon  = item.icon;
+          return (
+            <motion.button
+              key={item.id}
+              onClick={() => setActiveSection(item.id)}
+              className="focusable text-left rounded-2xl p-5 flex flex-col gap-4"
+              data-magnetic
+              data-magnetic-id={`browse-${item.id}`}
+              style={{ background: "rgba(22,26,38,0.7)", border: "1px solid rgba(46,52,71,0.3)", cursor: "none" }}
+              whileHover={{ background: "rgba(30,35,48,0.9)", borderColor: "rgba(153,247,255,0.18)", scale: 1.02 }}
+              whileFocus={{ background: "rgba(30,35,48,0.9)", borderColor: "rgba(153,247,255,0.18)", scale: 1.03 }}
+              whileTap={{ scale: 0.98 }}
+              transition={{ duration: 0.2 }}
+            >
+              <span style={{
+                width: 48, height: 48, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#99f7ff", background: "rgba(153,247,255,0.08)", border: "1px solid rgba(153,247,255,0.16)",
+              }}>
+                <Icon />
+              </span>
+              <div>
+                <p className="font-display font-bold text-on_surface" style={{ fontSize: "1.05rem" }}>{t(item.i18nKey)}</p>
+                <p className="font-mono-tech text-on_surface_variant text-xs mt-0.5">
+                  {count} {count === 1 ? "TITLE" : "TITLES"}
+                </p>
+              </div>
+            </motion.button>
+          );
+        })}
+      </div>
     </div>
   );
 }

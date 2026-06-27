@@ -7,7 +7,9 @@
     "anime": "Anime",
     "manga": "Manga",
     "search": "Search",
-    "settings": "Settings"
+    "settings": "Settings",
+    "browse": "Browse",
+    "browse_title": "Browse library"
   },
   "settings": {
     "title": "Settings",

@@ -44,6 +44,7 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
   const [isDraggingSeek, setIsDraggingSeek] = useState(false);
   const [markers, setMarkers] = useState<CloudMarker[]>([]);
   const [activeMarker, setActiveMarker] = useState<CloudMarker | null>(null);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
 
   // Subtitles (Plex desktop): the webview can't toggle a burned-in track, so picking one
   // rebuilds the stream with that subtitle burned in and reloads at the current position.
@@ -335,8 +336,48 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
         // Desktop: swallow the click so it doesn't reach the surface toggle. Touch:
         // let it bubble so a tap on the video reveals/hides the controls.
         onClick={(e) => { if (!isTouch) e.stopPropagation(); }}
+        onPlaying={() => setPlaybackError(null)}
+        onError={() => {
+          const code = videoRef.current?.error?.code;
+          // 4 = MEDIA_ERR_SRC_NOT_SUPPORTED (bad/unreachable source or codec), else network/decode.
+          setPlaybackError(
+            code === 4
+              ? "Couldn't play this title — the server may be unreachable, or your browser can't stream this format. If you're on Plex's relay, reconnect on the same network as the server."
+              : "Playback failed — couldn't reach the server. Check that it's online and try again."
+          );
+        }}
         style={{ zIndex: 1 }}
       />
+
+      {playbackError && (
+        <div
+          className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4 px-6 text-center"
+          style={{ background: "rgba(4,6,13,0.88)", backdropFilter: "blur(6px)" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ fontSize: 34, lineHeight: 1 }}>⚠️</div>
+          <p className="font-display font-bold text-white" style={{ fontSize: 18 }}>Playback failed</p>
+          <p className="font-body text-on_surface_variant text-sm" style={{ maxWidth: 440, lineHeight: 1.55 }}>
+            {playbackError}
+          </p>
+          <div className="flex items-center gap-3 mt-1">
+            <button
+              onClick={() => { setPlaybackError(null); videoRef.current?.load(); }}
+              className="focusable"
+              style={{ padding: "9px 20px", borderRadius: 12, fontSize: 13, fontWeight: 600, background: "rgba(153,247,255,0.14)", color: "#99f7ff", border: "1px solid rgba(153,247,255,0.32)" }}
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => onClose({ time: currentTime, season: item.season, episode: item.episode })}
+              className="focusable"
+              style={{ padding: "9px 18px", borderRadius: 12, fontSize: 13, fontWeight: 600, background: "rgba(255,255,255,0.05)", color: "rgba(224,230,240,0.75)", border: "1px solid rgba(255,255,255,0.12)" }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       <AnimatePresence>
         {activeMarker && (

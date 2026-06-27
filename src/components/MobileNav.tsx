@@ -1,17 +1,44 @@
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import { useButuStore } from "../store/useButuStore";
-import { NAV_ITEMS } from "./NavigationSidebar";
+import { NAV_ITEMS, CATEGORY_IDS } from "./NavigationSidebar";
 
-// ─── Bottom tab bar (touch / phone layout) ───────────────────────────────────
-// Replaces the hover-to-expand sidebar, which can't expand under a finger.
-// Thumb-reachable, icon-only (matches the minimalist sidebar), label on active.
-export const MOBILE_NAV_HEIGHT = 58;
+// ─── Bottom tab bar (touch / phone + tablet layout) ───────────────────────────
+// A tab bar works best with ≤5 destinations (Apple HIG / Material), and each tab
+// must lead to a DISTINCT VIEW — not an action or a sheet. So the phone gets three
+// real destinations — Home · Browse · Search — and the five content categories
+// live inside the Browse destination (like Apple Music's Library tab). Settings
+// sits in the top bar. The thumb zone stays uncluttered.
+export const MOBILE_NAV_HEIGHT = 60;
+
+const homeItem   = NAV_ITEMS.find((i) => i.id === "home")!;
+const searchItem = NAV_ITEMS.find((i) => i.id === "search")!;
+
+function BrowseIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7.5" height="7.5" rx="1.8" />
+      <rect x="13.5" y="3" width="7.5" height="7.5" rx="1.8" />
+      <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.8" />
+      <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.8" />
+    </svg>
+  );
+}
+
+const PRIMARY = [
+  { id: "home",   i18nKey: homeItem.i18nKey,   icon: homeItem.icon   },
+  { id: "browse", i18nKey: "nav.browse",        icon: BrowseIcon      },
+  { id: "search", i18nKey: searchItem.i18nKey,  icon: searchItem.icon },
+];
 
 export function MobileNav() {
   const { t } = useTranslation();
   const activeSection = useButuStore((s) => s.activeSection);
   const setActiveSection = useButuStore((s) => s.setActiveSection);
+
+  // Browse stays selected while the user is inside one of its categories,
+  // exactly like Apple Music keeps "Library" lit while you're in Albums.
+  const browseSelected = activeSection === "browse" || CATEGORY_IDS.includes(activeSection);
 
   return (
     <nav
@@ -23,8 +50,7 @@ export function MobileNav() {
         zIndex: 45,
         display: "flex",
         alignItems: "stretch",
-        // Grow by the bottom inset so the home-indicator area doesn't squish the icons.
-        height: `calc(${MOBILE_NAV_HEIGHT}px + env(safe-area-inset-bottom))`,
+        height: MOBILE_NAV_HEIGHT,
         paddingBottom: "env(safe-area-inset-bottom)",
         background: "rgba(8,10,15,0.94)",
         backdropFilter: "blur(18px)",
@@ -32,15 +58,15 @@ export function MobileNav() {
         borderTop: "1px solid rgba(153,247,255,0.08)",
       }}
     >
-      {NAV_ITEMS.map((item) => {
-        const isActive = activeSection === item.id;
+      {PRIMARY.map((item) => {
+        const isActive = item.id === "browse" ? browseSelected : activeSection === item.id;
         const Icon = item.icon;
         return (
           <button
             key={item.id}
             onClick={() => setActiveSection(item.id)}
             aria-label={t(item.i18nKey)}
-            className="no-tap-highlight"
+            className="mobile-nav-item no-tap-highlight"
             style={{
               position: "relative",
               flex: 1,
@@ -49,7 +75,7 @@ export function MobileNav() {
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              gap: 3,
+              gap: 4,
               padding: 0,
               border: "none",
               background: "transparent",
@@ -57,14 +83,14 @@ export function MobileNav() {
               transition: "color 0.18s ease",
             }}
           >
-            {/* active top indicator */}
+            {/* active top indicator — the only selection cue we want */}
             {isActive && (
               <motion.span
                 layoutId="mobile-nav-pill"
                 style={{
                   position: "absolute",
                   top: 0,
-                  width: 22,
+                  width: 24,
                   height: 2.5,
                   borderRadius: 99,
                   background: "#99f7ff",
@@ -78,13 +104,10 @@ export function MobileNav() {
             <span
               style={{
                 fontFamily: "'Manrope', sans-serif",
-                fontSize: 9.5,
+                fontSize: 10.5,
                 fontWeight: 600,
                 letterSpacing: "0.01em",
                 whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                maxWidth: "100%",
               }}
             >
               {t(item.i18nKey)}

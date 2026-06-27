@@ -193,6 +193,16 @@
   input, textarea { cursor: text !important; }
   /* Native-feeling taps: kill the grey/blue flash on every interactive element. */
   *, *::before, *::after { -webkit-tap-highlight-color: transparent; }
+  /* No TV d-pad focus halo on touch — a finger doesn't need it. `html …` lifts the
+     specificity above tvFocusManager's injected `button:focus { … !important }`.
+     (The player seek bar's own focus style is a class selector, so it still wins.) */
+  html button:focus,
+  html .focusable:focus,
+  html [tabindex]:focus {
+    box-shadow: none !important;
+    transform: none !important;
+    z-index: auto !important;
+  }
   /* MediaCard info bar is opacity-0 until group-hover/focus — show it always. */
   .card-info { opacity: 1 !important; transform: none !important; }
   /* ...and darken the scrim enough that the always-on title stays legible. */
@@ -212,6 +222,16 @@ button.nav-sidebar-item:focus,
 .nav-sidebar-item.focusable:focus {
   box-shadow: none !important;
   transform: none !important;
+}
+
+/* Mobile bottom nav / top-bar / Browse-sheet controls: a finger doesn't need the
+   TV d-pad focus halo — the small active pill (and per-row highlight) is enough.
+   Specificity (0,2,0)+ beats the injected `button:focus !important` ring. */
+.mobile-nav-item:focus,
+button.mobile-nav-item:focus {
+  box-shadow: none !important;
+  transform: none !important;
+  z-index: auto !important;
 }
 
 /* Player seek bar: thin horizontal bar — replace the wide global halo with a

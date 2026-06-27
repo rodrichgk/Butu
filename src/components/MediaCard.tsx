@@ -18,15 +18,16 @@ function getCardClass(type: MediaItem["type"]): string {
   }
 }
 
-// Responsive widths so phones show ~2.3 cards, tablets more, desktop/TV unchanged.
+// Responsive widths. Phone (base) sizes are bumped up for comfortable touch
+// browsing; tablet (md) and desktop/TV (lg) sizes are unchanged.
 function getCardWidth(type: MediaItem["type"]): string {
   switch (type) {
     case "movie": case "anime": case "manga": case "music":
-      return "w-32 sm:w-40 md:w-44 lg:w-52";   // 128 → 208px
+      return "w-40 sm:w-44 lg:w-52";   // phone 160 → desktop 208px
     case "tv":    case "web":
-      return "w-56 sm:w-64 md:w-72 lg:w-80";    // 224 → 320px
+      return "w-64 md:w-72 lg:w-80";    // phone 256 → desktop 320px
     default:
-      return "w-32 sm:w-40 md:w-44 lg:w-52";
+      return "w-40 sm:w-44 lg:w-52";
   }
 }
 

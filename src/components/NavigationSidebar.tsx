@@ -102,6 +102,10 @@ export const NAV_ITEMS = [
   { id: "settings", i18nKey: "nav.settings", icon: SettingsIcon },
 ];
 
+// The content categories grouped under the mobile "Browse" destination.
+export const CATEGORY_IDS = ["movies", "tv", "anime", "manga", "music"];
+export const CATEGORY_ITEMS = NAV_ITEMS.filter((i) => CATEGORY_IDS.includes(i.id));
+
 // ─── Hairline divider ─────────────────────────────────────────────────────────
 function Hairline() {
   return (

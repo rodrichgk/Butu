@@ -29,9 +29,31 @@ async function plexFetch(url: string, token?: string): Promise<any> {
     const text = await tauri.invoke("fetch_plex", { url, headers }) as string;
     return JSON.parse(text);
   }
-  const res = await fetch(url, { headers });
+  // Browser path: send the X-Plex params in the QUERY STRING and use only the
+  // CORS-safelisted Accept header, so this stays a "simple" request with NO
+  // preflight. Custom X-Plex-* request headers trigger an OPTIONS preflight that
+  // direct PMS connections reject — which made local/remote servers look
+  // unreachable and forced the flaky plex.tv relay. (Plex Web does it this way;
+  // see plexTranscodeDecision below, which already drops headers for this reason.)
+  // The Tauri/Rust path above has no CORS, so it keeps using headers.
+  const res = await fetch(withPlexParams(url, token), { headers: { Accept: "application/json" } });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
+}
+
+/** Appends the X-Plex auth/client params to the query string (no-op if already set). */
+function withPlexParams(url: string, token?: string): string {
+  try {
+    const u = new URL(url);
+    const set = (k: string, v: string) => { if (!u.searchParams.has(k)) u.searchParams.set(k, v); };
+    set("X-Plex-Client-Identifier", CLIENT_ID);
+    set("X-Plex-Product", "Butu");
+    set("X-Plex-Version", "0.1.0");
+    if (token) set("X-Plex-Token", token);
+    return u.toString();
+  } catch {
+    return url;
+  }
 }
 
 function plexHeaders(token?: string): Record<string, string> {
