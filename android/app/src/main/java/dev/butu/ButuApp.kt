@@ -1,6 +1,7 @@
 package dev.butu
 
 import android.app.Application
+import dev.butu.data.plex.PlexClientId
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
@@ -15,6 +16,12 @@ import java.util.concurrent.TimeUnit
 
 @HiltAndroidApp
 class ButuApp : Application(), SingletonImageLoader.Factory {
+
+    override fun onCreate() {
+        super.onCreate()
+        // Ensure a unique, stable Plex client id exists before any Plex request.
+        PlexClientId.init(this)
+    }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader {
         val httpClient = OkHttpClient.Builder()

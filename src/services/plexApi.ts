@@ -1,6 +1,22 @@
 import type { PlexConfig, MediaItem, Episode } from "../types";
 
-export const CLIENT_ID = "butu-tv-v1";
+// Per-install Plex client identifier. Plex uses X-Plex-Client-Identifier to tell
+// devices apart, so each install must report a UNIQUE, stable value — otherwise two
+// Butu clients on the same account collide (one device entry, clashing sessions).
+// Generated once and persisted; falls back to a constant if storage is unavailable.
+export const CLIENT_ID: string = (() => {
+  const KEY = "butu:plex-client-id";
+  try {
+    const existing = localStorage.getItem(KEY);
+    if (existing) return existing;
+    const rand = (crypto as any)?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    const id = `butu-${rand}`;
+    localStorage.setItem(KEY, id);
+    return id;
+  } catch {
+    return "butu-tv-v1";
+  }
+})();
 
 /**
  * Headers Plex expects on every authenticated request. Token + identifier are

@@ -2,6 +2,7 @@ package dev.butu.data.plex
 
 import android.util.Base64
 
+// Legacy fallback only — the live value comes from PlexClientId.value (per-install).
 internal const val PLEX_CLIENT_ID = "butu-android-tv-v1"
 internal const val PLEX_PRODUCT   = "Butu"
 internal const val PLEX_VERSION   = "0.1.0"
@@ -9,7 +10,7 @@ internal const val PLEX_PLATFORM  = "Android TV"
 
 /** Mirrors `plexHeaders()` in src/services/plexApi.ts. */
 fun plexHeaders(token: String? = null): Map<String, String> = buildMap {
-    put("X-Plex-Client-Identifier", PLEX_CLIENT_ID)
+    put("X-Plex-Client-Identifier", PlexClientId.value)
     put("X-Plex-Product", PLEX_PRODUCT)
     put("X-Plex-Version", PLEX_VERSION)
     put("X-Plex-Platform", PLEX_PLATFORM)

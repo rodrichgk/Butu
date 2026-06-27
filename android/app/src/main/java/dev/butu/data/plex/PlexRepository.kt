@@ -437,7 +437,7 @@ internal fun plexUniversalParams(
     boostVoices: Boolean = true,
 ): String = buildList {
     add("X-Plex-Token" to cfg.token)
-    add("X-Plex-Client-Identifier" to PLEX_CLIENT_ID)
+    add("X-Plex-Client-Identifier" to PlexClientId.value)
     // Match React: report as Chrome so Plex returns the remux HLS profile.
     // PMS rejects (HTTP 400) directStream=1 for "Android TV" platform.
     add("X-Plex-Platform" to "Chrome")
@@ -532,7 +532,7 @@ private fun plexTvTranscodeParams(cfg: PlexConfig, ratingKey: String, session: S
         "X-Plex-Incomplete-Segments" to "1",
         "X-Plex-Product" to PLEX_PRODUCT,
         "X-Plex-Version" to PLEX_VERSION,
-        "X-Plex-Client-Identifier" to PLEX_CLIENT_ID,
+        "X-Plex-Client-Identifier" to PlexClientId.value,
         "X-Plex-Platform" to PLEX_PLATFORM,
         "X-Plex-Platform-Version" to "12.0",
         "X-Plex-Features" to "external-media,indirect-media",
