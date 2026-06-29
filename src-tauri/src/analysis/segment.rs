@@ -290,6 +290,76 @@ pub async fn detect_credits_blackframe(
     None
 }
 
+/// Refines a fingerprint-detected credits start back to where the credits
+/// VISUALLY begin. Cross-episode fingerprinting only finds the recurring end
+/// *theme music*, which on shows like Stranger Things starts well after the
+/// credits roll begins (over a unique-per-episode song). So we scan a bounded
+/// window ending at `music_start_ms` for the fade-to-black that cuts into the
+/// credit roll and return its timestamp.
+///
+/// Heuristic: in the few minutes before the recurring theme, the episode is
+/// still normal footage (not sustained black), so the EARLIEST black segment in
+/// the window is the cut into the credits. Returns `None` (caller keeps the
+/// fingerprint start) when no fade is found.
+pub async fn find_credits_fade_in_range(
+    app: &AppHandle,
+    stream_url: &str,
+    headers: Option<&HashMap<String, String>>,
+    search_start_ms: u64,
+    music_start_ms: u64,
+) -> Option<u64> {
+    if music_start_ms <= search_start_ms {
+        return None;
+    }
+    let start_s = search_start_ms / 1000;
+    let len_s = (music_start_ms - search_start_ms) / 1000;
+    if len_s < 2 {
+        return None;
+    }
+
+    let mut args: Vec<String> = vec![
+        "-hide_banner".into(),
+        "-loglevel".into(),
+        "info".into(),
+        "-nostdin".into(),
+        "-hwaccel".into(),
+        "auto".into(),
+        "-ss".into(),
+        start_s.to_string(),
+    ];
+    if let Some(h) = build_header_arg(headers) {
+        args.push("-headers".into());
+        args.push(h);
+    }
+    args.extend([
+        "-i".into(),
+        stream_url.to_string(),
+        "-t".into(),
+        len_s.to_string(),
+        "-an".into(),
+        "-vf".into(),
+        "scale=160:90,blackdetect=d=0.25:pix_th=0.10".into(),
+        "-f".into(),
+        "null".into(),
+        "-".into(),
+    ]);
+
+    let (_, stderr) = match run_ffmpeg(app, args).await {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!("find_credits_fade_in_range blackdetect failed: {e}");
+            return None;
+        }
+    };
+
+    let search_start_ms_f = search_start_ms;
+    parse_black_ends(&stderr)
+        .into_iter()
+        .map(|rel_s| search_start_ms_f + (rel_s * 1000.0) as u64)
+        .filter(|&end_ms| end_ms < music_start_ms)
+        .min()
+}
+
 /// Pulls the `black_end:<secs>` value out of every blackdetect log line.
 fn parse_black_ends(stderr: &str) -> Vec<f64> {
     let mut ends = Vec::new();

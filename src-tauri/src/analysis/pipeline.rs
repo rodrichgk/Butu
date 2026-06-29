@@ -11,7 +11,7 @@ use tauri::{AppHandle, Emitter};
 use crate::analysis::audio::{cleanup_pcm, extract_pcm_window};
 use crate::analysis::detect::{detect_markers, Detection};
 use crate::analysis::fingerprint::{fingerprint_pcm, Fingerprint};
-use crate::analysis::segment::{detect_credits_blackframe, read_chapters};
+use crate::analysis::segment::{detect_credits_blackframe, find_credits_fade_in_range, read_chapters};
 use crate::analysis::types::{
     DetectedMarker, EpisodeInput, EpisodeResult, EpisodeStage, MarkerType, MediaKind,
     ProgressEvent, SeasonInput, ShowInput,
@@ -44,6 +44,10 @@ const INTRO_MIN_MS: u64 = 8_000;
 const INTRO_MAX_MS: u64 = 180_000;
 const CREDITS_MIN_MS: u64 = 15_000;
 const CREDITS_MAX_MS: u64 = 8 * 60_000;
+/// How far before the recurring credits *music* to look for the visual fade-to-
+/// credits when refining the start. Capped so a wrong fade can't drag the start
+/// wildly early; ~6 min covers a long localized credit roll.
+const CREDITS_REFINE_LOOKBACK_MS: u64 = 6 * 60_000;
 /// Movie credit rolls run longer than episodic ones; cap at the submit limit.
 const CREDITS_MAX_MOVIE_MS: u64 = 10 * 60_000;
 
@@ -154,7 +158,20 @@ pub async fn analyze(
                     let span = d.end_ms.saturating_sub(d.start_ms);
                     if d.agreement >= MIN_AGREEMENT && (CREDITS_MIN_MS..=CREDITS_MAX_MS).contains(&span) {
                         let off = ep.duration_ms.saturating_sub(CREDITS_WINDOW_LEN_S * 1000);
-                        credits = Some((off + d.start_ms, off + d.end_ms));
+                        let fp_start = off + d.start_ms;
+                        let fp_end = off + d.end_ms;
+                        // The recurring end-theme that fingerprinting locks onto often starts
+                        // well AFTER the credits visually begin (they roll over a unique-per-
+                        // episode song first — e.g. Stranger Things). Pull the start back to the
+                        // fade-to-black that cuts into the credit roll, when one sits close before.
+                        let search_start = fp_start.saturating_sub(CREDITS_REFINE_LOOKBACK_MS);
+                        let start = match find_credits_fade_in_range(
+                            &app, &ep.stream_url, ep.headers.as_ref(), search_start, fp_start,
+                        ).await {
+                            Some(fade) if fade < fp_start => fade,
+                            _ => fp_start,
+                        };
+                        credits = Some((start, fp_end));
                     }
                 }
                 // Fallback: shows like GoT reuse no credits music across episodes,
