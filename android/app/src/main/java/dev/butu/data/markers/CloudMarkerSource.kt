@@ -40,22 +40,21 @@ class CloudMarkerSource @Inject constructor(
             .sortedBy { providerPriority(it.first) }
         if (keys.isEmpty()) return emptyList()
 
+        // Markers are keyed by the SHOW's provider id + season + episode, but Plex also
+        // tags each episode with its OWN per-episode ids (e.g. the episode's tmdb id, which
+        // never matches the show-keyed rows). So we try every id and keep the first that
+        // yields markers. Crucially, a cached EMPTY for one id (the episode id) must NOT
+        // short-circuit and stop us from trying the show id — only a cached HIT returns early.
         for ((provider, providerId) in keys) {
             val cacheKey = "$provider:$providerId:${target.season ?: "_"}:${target.episode ?: "_"}"
-            cache[cacheKey]?.let { 
-                android.util.Log.i("CloudMarkerSource", "Cache hit for $cacheKey -> ${it.size} markers")
-                return it 
-            }
-
-            android.util.Log.i("CloudMarkerSource", "Querying Supabase for $cacheKey")
-            val results = runCatching {
+            val results = cache[cacheKey] ?: runCatching {
+                android.util.Log.i("CloudMarkerSource", "Querying Supabase for $cacheKey")
                 queryMarkers(provider, providerId, target.season, target.episode)
             }.onFailure {
                 android.util.Log.e("CloudMarkerSource", "queryMarkers failed for $cacheKey", it)
-            }.getOrNull().orEmpty()
+            }.getOrNull().orEmpty().also { cache[cacheKey] = it }
 
-            android.util.Log.i("CloudMarkerSource", "queryMarkers returned ${results.size} markers for $cacheKey")
-            cache[cacheKey] = results
+            android.util.Log.i("CloudMarkerSource", "$cacheKey -> ${results.size} markers")
             if (results.isNotEmpty()) return results
         }
         return emptyList()
