@@ -1,7 +1,7 @@
 import type { JellyfinConfig, MediaItem, Episode } from "../types";
 
 const DEVICE_ID = "butu-desktop-v1";
-const CLIENT_INFO = `Client="Butu", Device="Desktop", DeviceId="${DEVICE_ID}", Version="0.1.0"`;
+const CLIENT_INFO = `Client="Butu", Device="Desktop", DeviceId="${DEVICE_ID}", Version="${__APP_VERSION__}"`;
 
 function authHeader(token?: string): Record<string, string> {
   const base = `MediaBrowser ${CLIENT_INFO}`;

@@ -165,7 +165,7 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
               <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="font-body text-sm" style={{ color: "rgba(224,230,240,0.55)", textDecoration: "underline", cursor: "pointer" }}>
                 {t('landing.opensource')}
               </a>
-              <span className="font-mono-tech text-xs" style={{ color: "rgba(224,230,240,0.25)" }}>BUTU · v0.1.0</span>
+              <span className="font-mono-tech text-xs" style={{ color: "rgba(224,230,240,0.25)" }}>BUTU · v{__APP_VERSION__}</span>
             </div>
           </div>
         </Section>

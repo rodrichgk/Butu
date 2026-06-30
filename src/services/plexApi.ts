@@ -27,7 +27,7 @@ export function plexRequestHeaders(token: string): Record<string, string> {
     "X-Plex-Token": token,
     "X-Plex-Client-Identifier": CLIENT_ID,
     "X-Plex-Product": "Butu",
-    "X-Plex-Version": "0.1.0",
+    "X-Plex-Version": __APP_VERSION__,
     "X-Plex-Platform": "Chrome",
     "X-Plex-Device": "Linux",
     "X-Plex-Device-Name": "Butu (Chrome)",
@@ -64,7 +64,7 @@ function withPlexParams(url: string, token?: string): string {
     const set = (k: string, v: string) => { if (!u.searchParams.has(k)) u.searchParams.set(k, v); };
     set("X-Plex-Client-Identifier", CLIENT_ID);
     set("X-Plex-Product", "Butu");
-    set("X-Plex-Version", "0.1.0");
+    set("X-Plex-Version", __APP_VERSION__);
     if (token) set("X-Plex-Token", token);
     return u.toString();
   } catch {
@@ -76,7 +76,7 @@ function plexHeaders(token?: string): Record<string, string> {
   return {
     "X-Plex-Client-Identifier": CLIENT_ID,
     "X-Plex-Product": "Butu",
-    "X-Plex-Version": "0.1.0",
+    "X-Plex-Version": __APP_VERSION__,
     "X-Plex-Platform": "Android TV",
     "Accept": "application/json",
     ...(token ? { "X-Plex-Token": token } : {}),
@@ -437,7 +437,7 @@ export function plexTranscodeUrl(cfg: PlexConfig, ratingKey: string): string {
     "X-Plex-Client-Identifier": CLIENT_ID,
     "X-Plex-Platform": "Chrome",
     "X-Plex-Product": "Butu",
-    "X-Plex-Version": "0.1.0",
+    "X-Plex-Version": __APP_VERSION__,
     "path": `/library/metadata/${ratingKey}`,
     "protocol": "hls",
     "mediaIndex": "0",
@@ -482,7 +482,7 @@ function tvTranscodeParams(cfg: PlexConfig, ratingKey: string, session: string):
     "X-Plex-Session-Identifier": session,
     "X-Plex-Incomplete-Segments": "1",
     "X-Plex-Product": "Butu",
-    "X-Plex-Version": "0.1.0",
+    "X-Plex-Version": __APP_VERSION__,
     "X-Plex-Client-Identifier": CLIENT_ID,
     "X-Plex-Platform": "Android TV",
     "X-Plex-Platform-Version": "12.0",

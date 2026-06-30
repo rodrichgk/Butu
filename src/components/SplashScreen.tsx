@@ -120,7 +120,7 @@ export function SplashScreen({ onComplete, duration = 4200 }: SplashScreenProps)
         className="absolute font-mono-tech text-white"
         style={{ bottom: 38, fontSize: 9, letterSpacing: "0.25em" }}
       >
-        v0.1.0
+        v{__APP_VERSION__}
       </motion.p>
     </motion.div>
   );

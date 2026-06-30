@@ -337,7 +337,7 @@ private fun VersionTag(modifier: Modifier) {
         alpha.animateTo(0.18f, tween(1_000))
     }
     Text(
-        text = "v0.1.0",
+        text = "v${dev.butu.BuildConfig.VERSION_NAME}",
         color = Color.White,
         style = ButuType.LabelMd.copy(
             fontSize = 9.sp,

@@ -623,7 +623,7 @@ private fun SettingsContent(
 
                 Spacer(Modifier.height(20.dp))
                 Text(
-                    text = "v0.1.0",
+                    text = "v${dev.butu.BuildConfig.VERSION_NAME}",
                     color = ButuColors.OnSurface.copy(alpha = 0.22f),
                     style = ButuType.LabelMd.copy(fontSize = 11.sp),
                 )

@@ -1,11 +1,12 @@
 package dev.butu.data.plex
 
 import android.util.Base64
+import dev.butu.BuildConfig
 
 // Legacy fallback only — the live value comes from PlexClientId.value (per-install).
 internal const val PLEX_CLIENT_ID = "butu-android-tv-v1"
 internal const val PLEX_PRODUCT   = "Butu"
-internal const val PLEX_VERSION   = "0.1.0"
+internal val PLEX_VERSION   = BuildConfig.VERSION_NAME
 internal const val PLEX_PLATFORM  = "Android TV"
 
 /** Mirrors `plexHeaders()` in src/services/plexApi.ts. */

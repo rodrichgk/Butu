@@ -1246,7 +1246,7 @@ function SettingsView() {
       </AnimatePresence>
 
       <div className="mt-10 max-w-2xl">
-        <p className="font-mono-tech text-on_surface_variant text-xs mb-1">BUTU v0.1.0</p>
+        <p className="font-mono-tech text-on_surface_variant text-xs mb-1">BUTU v{__APP_VERSION__}</p>
         <p className="font-mono-tech text-on_surface_variant text-xs opacity-50">
           Crowdsourced intro/credits markers · Tauri · React
         </p>

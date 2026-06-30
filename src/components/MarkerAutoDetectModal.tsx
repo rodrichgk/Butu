@@ -252,7 +252,7 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
         endpoint: `${SUPABASE_URL!.replace(/\/$/, "")}/functions/v1/submit-markers`,
         anon_key: SUPABASE_ANON_KEY!,
         submitted_by: "auto",
-        source: "butu-companion/0.1.0",
+        source: `butu-companion/${__APP_VERSION__}`,
       });
       setSubmitResult({ inserted: resp.inserted, episodes: resp.episode_count });
       setPhase("submitted");

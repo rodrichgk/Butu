@@ -128,7 +128,7 @@ pub async fn submit_markers(
 
         let body = serde_json::json!({
             "submitted_by": args.submitted_by.clone().unwrap_or_else(|| "auto".into()),
-            "source": args.source.clone().unwrap_or_else(|| "butu-companion/0.1.0".into()),
+            "source": args.source.clone().unwrap_or_else(|| format!("butu-companion/{}", env!("CARGO_PKG_VERSION"))),
             "episodes": episodes,
         });
 
