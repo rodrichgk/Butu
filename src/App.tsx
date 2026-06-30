@@ -6,6 +6,7 @@ import { NavigationSidebar, CATEGORY_IDS, CATEGORY_ITEMS } from "./components/Na
 import { HeroCarousel } from "./components/HeroCarousel";
 import { MediaStage } from "./components/MediaStage";
 import { MobileNav, MOBILE_NAV_HEIGHT } from "./components/MobileNav";
+import { UpdateBanner } from "./components/UpdateBanner";
 import { MobileTopBar } from "./components/MobileTopBar";
 import { useTouchLayout } from "./hooks/useIsMobile";
 import { ButuPlayer } from "./components/ButuPlayer";
@@ -471,6 +472,7 @@ export default function App() {
         >
         {/* Sticky app bar (touch only) — sits in normal flow so content starts below it */}
         {isTouchLayout && <MobileTopBar />}
+        <UpdateBanner />
         <ConnectionErrorBanner />
         {activeSection === "home" && settings.showHero && featured.length > 0 && (
           <div className="relative h-[42vh] min-h-[300px] lg:h-[55vh] lg:min-h-[480px] mb-6 lg:mb-12 flex-shrink-0">
