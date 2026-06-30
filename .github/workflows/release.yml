@@ -28,8 +28,22 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+      # Supabase creds for the build. Vite inlines VITE_* from .env, which CI doesn't
+      # have otherwise — without this the companion's marker auto-detect submit fails
+      # with "credentials missing". The anon key is public (RLS-protected), already
+      # shipped in the public web bundle.
+      - name: Write .env (Supabase)
+        shell: bash
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          {
+            echo "VITE_SUPABASE_URL=$SUPABASE_URL"
+            echo "VITE_SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"
+          } > .env
       # Builds the web assets (beforeBuildCommand) + the Tauri bundles. Unsigned — see the
-      # "Is it safe?" note in the README. No secrets required.
+      # "Is it safe?" note in the README.
       - name: Build Tauri bundles
         run: npm run tauri build
       - name: Publish installers to the release
@@ -68,6 +82,17 @@ jobs:
             echo "keyAlias=$KEY_ALIAS"
             echo "keyPassword=$STORE_PASSWORD"
           } > keystore.properties
+      # android/app/build.gradle.kts reads SUPABASE_* from the repo-root .env into
+      # BuildConfig; without it the TV app can't read cloud markers.
+      - name: Write .env (Supabase)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          {
+            echo "SUPABASE_URL=$SUPABASE_URL"
+            echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"
+          } > .env
       - name: Build signed release APK
         run: |
           cd android
