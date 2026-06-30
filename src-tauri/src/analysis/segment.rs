@@ -290,17 +290,35 @@ pub async fn detect_credits_blackframe(
     None
 }
 
+/// Average luma (0–255) above this is episode footage; credits (white text on
+/// black, plus the odd coloured logo card) sit well below. Tuned on real episodes.
+const FOOTAGE_LUMA: f64 = 34.0;
+/// Tolerate a brighter credit card / logo up to this many frames (@ 1 fps) while
+/// walking back through the credits — a longer bright run is real footage.
+const CARD_TOLERANCE_FRAMES: usize = 20;
+/// Moving-average window (frames @ 1 fps) to absorb single-frame luma spikes.
+const LUMA_SMOOTH: usize = 7;
+/// Ignore a pull-back shorter than this — credits already start ~at the theme.
+const MIN_PULLBACK_MS: u64 = 20_000;
+/// …and never pull back more than this. A dark *scene* that merges straight into
+/// the credits (no footage gap) walks back too far; capping it keeps the safe,
+/// late theme start instead of firing Up-Next during the actual episode.
+const MAX_PULLBACK_MS: u64 = 200_000;
+
 /// Refines a fingerprint-detected credits start back to where the credits
-/// VISUALLY begin. Cross-episode fingerprinting only finds the recurring end
-/// *theme music*, which on shows like Stranger Things starts well after the
-/// credits roll begins (over a unique-per-episode song). So we scan a bounded
-/// window ending at `music_start_ms` for the fade-to-black that cuts into the
-/// credit roll and return its timestamp.
+/// VISUALLY begin. Cross-episode fingerprinting only locks onto the recurring end
+/// *theme music*, which on shows like Stranger Things starts well after the credit
+/// roll begins (over a unique-per-episode song). So we sample per-second luma over
+/// `[search_start_ms, music_start_ms]` and walk BACK from the theme through the
+/// dark credit roll (tolerating brief brighter credit cards) until we hit
+/// sustained footage — that boundary is where the credits visually start.
 ///
-/// Heuristic: in the few minutes before the recurring theme, the episode is
-/// still normal footage (not sustained black), so the EARLIEST black segment in
-/// the window is the cut into the credits. Returns `None` (caller keeps the
-/// fingerprint start) when no fade is found.
+/// Validated against real episodes + extracted frames: a dark *scene* before the
+/// credits is excluded because real footage sits between it and the credits; and
+/// when a dark scene merges straight into the credits with no footage gap, the
+/// walk overshoots and the pull-back cap keeps the safe (late) theme start. Both
+/// avoid a false-early Up-Next during the episode. Returns `None` to keep the
+/// fingerprint start.
 pub async fn find_credits_fade_in_range(
     app: &AppHandle,
     stream_url: &str,
@@ -313,14 +331,14 @@ pub async fn find_credits_fade_in_range(
     }
     let start_s = search_start_ms / 1000;
     let len_s = (music_start_ms - search_start_ms) / 1000;
-    if len_s < 2 {
+    if len_s < 30 {
         return None;
     }
 
     let mut args: Vec<String> = vec![
         "-hide_banner".into(),
         "-loglevel".into(),
-        "info".into(),
+        "error".into(),
         "-nostdin".into(),
         "-hwaccel".into(),
         "auto".into(),
@@ -337,27 +355,86 @@ pub async fn find_credits_fade_in_range(
         "-t".into(),
         len_s.to_string(),
         "-an".into(),
+        // 1 fps of average luma, printed to stdout. Tiny scale keeps it cheap.
         "-vf".into(),
-        "scale=160:90,blackdetect=d=0.25:pix_th=0.10".into(),
+        "fps=1,scale=64:36,signalstats,metadata=print:file=-".into(),
         "-f".into(),
         "null".into(),
         "-".into(),
     ]);
 
-    let (_, stderr) = match run_ffmpeg(app, args).await {
+    let (stdout, _) = match run_ffmpeg(app, args).await {
         Ok(v) => v,
         Err(e) => {
-            tracing::warn!("find_credits_fade_in_range blackdetect failed: {e}");
+            tracing::warn!("find_credits_fade_in_range pass failed: {e}");
             return None;
         }
     };
 
-    let search_start_ms_f = search_start_ms;
-    parse_black_ends(&stderr)
-        .into_iter()
-        .map(|rel_s| search_start_ms_f + (rel_s * 1000.0) as u64)
-        .filter(|&end_ms| end_ms < music_start_ms)
-        .min()
+    // (time_s relative to ss, luma) per frame.
+    let lumas = parse_yavg(&String::from_utf8_lossy(&stdout));
+    if lumas.len() < 30 {
+        return None;
+    }
+
+    // Smooth to absorb single-frame luma spikes.
+    let n = lumas.len();
+    let half = LUMA_SMOOTH / 2;
+    let sm: Vec<f64> = (0..n)
+        .map(|i| {
+            let a = i.saturating_sub(half);
+            let b = (i + half + 1).min(n);
+            lumas[a..b].iter().map(|&(_, y)| y).sum::<f64>() / (b - a) as f64
+        })
+        .collect();
+
+    // Walk back from the theme through the dark credits; a credit card (brief
+    // bright run) is tolerated, sustained footage stops us. `boundary` tracks the
+    // earliest dark frame reached — the footage→credits transition.
+    let mut bright = 0usize;
+    let mut boundary = n - 1;
+    let mut i = n as isize - 1;
+    while i >= 0 {
+        let idx = i as usize;
+        if sm[idx] < FOOTAGE_LUMA {
+            bright = 0;
+            boundary = idx;
+        } else {
+            bright += 1;
+            if bright >= CARD_TOLERANCE_FRAMES {
+                break;
+            }
+        }
+        i -= 1;
+    }
+
+    let credits_start_ms = start_s * 1000 + (lumas[boundary].0 * 1000.0) as u64;
+    let pullback = music_start_ms.saturating_sub(credits_start_ms);
+    if (MIN_PULLBACK_MS..=MAX_PULLBACK_MS).contains(&pullback) {
+        Some(credits_start_ms)
+    } else {
+        None
+    }
+}
+
+/// Parses `metadata=print` output: pairs each `pts_time:<s>` with the following
+/// `lavfi.signalstats.YAVG=<luma>` into (time_s, luma).
+fn parse_yavg(stdout: &str) -> Vec<(f64, f64)> {
+    let mut out = Vec::new();
+    let mut t: Option<f64> = None;
+    for line in stdout.lines() {
+        let line = line.trim();
+        if let Some(idx) = line.find("pts_time:") {
+            let rest = &line[idx + "pts_time:".len()..];
+            let tok: String = rest.chars().take_while(|c| c.is_ascii_digit() || *c == '.').collect();
+            t = tok.parse::<f64>().ok();
+        } else if let Some(v) = line.strip_prefix("lavfi.signalstats.YAVG=") {
+            if let (Some(time), Ok(y)) = (t, v.trim().parse::<f64>()) {
+                out.push((time, y));
+            }
+        }
+    }
+    out
 }
 
 /// Pulls the `black_end:<secs>` value out of every blackdetect log line.
