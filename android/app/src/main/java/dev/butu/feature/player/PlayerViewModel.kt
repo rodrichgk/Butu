@@ -1035,8 +1035,10 @@ class PlayerViewModel @Inject constructor(
 
         val prog = WatchProgress(
             timeSeconds = seconds,
-            season = item.season,
-            episode = item.episode,
+            // Use the playing EPISODE's season/episode — resolvedItem is the show and can carry
+            // null here, which left the show's resume pointer unable to identify the episode.
+            season = resolvedEpisode?.season ?: item.season,
+            episode = resolvedEpisode?.episode ?: item.episode,
             durationSeconds = durationSec,
             updatedAt = System.currentTimeMillis(),
         )

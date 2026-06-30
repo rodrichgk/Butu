@@ -949,8 +949,13 @@ private fun resolveMainPlay(
             if (ep != null) {
                 val epProg = state.episodeProgress[ep.id]
                 val isFinished = epProg != null && ep.durationSeconds > 0 && epProg.timeSeconds >= (ep.durationSeconds * 0.95f)
-                if (isFinished) onPlay(item.id, 0L, ep.id)
-                else onPlay(item.id, prog.timeSeconds * 1_000L, ep.id)
+                // Prefer the episode's own progress; the show pointer's timeSeconds can lag it.
+                val resumeMs = when {
+                    isFinished -> 0L
+                    epProg != null -> epProg.timeSeconds * 1_000L
+                    else -> prog.timeSeconds * 1_000L
+                }
+                onPlay(item.id, resumeMs, ep.id)
             }
             else onPlay(item.id, prog.timeSeconds * 1_000L, null)
         }
@@ -984,9 +989,16 @@ private fun resolveEpisodePlay(
     val epProg = state.episodeProgress[ep.id]
     
     val isFinished = epProg != null && ep.durationSeconds > 0 && epProg.timeSeconds >= (ep.durationSeconds * 0.95f)
-    val isResume = !isFinished && prog?.season == ep.season && prog?.episode == ep.episode
-    
-    val startMs = if (isResume && prog != null) prog.timeSeconds * 1_000L else 0L
+
+    // Resume from the EPISODE's own saved position. The show-level `prog` only tracks the
+    // most-recently-watched episode, so keying off it reset every other episode to 0 even
+    // though its own progress (and the card) still showed the real timestamp.
+    val startMs = when {
+        isFinished -> 0L
+        epProg != null -> epProg.timeSeconds * 1_000L
+        prog?.season == ep.season && prog?.episode == ep.episode -> (prog?.timeSeconds ?: 0) * 1_000L
+        else -> 0L
+    }
     onPlay(item.id, startMs, ep.id)
 }
 
