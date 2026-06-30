@@ -233,7 +233,7 @@ export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
             )}
           </div>
 
-          <p className="hidden sm:block font-body text-on_surface_variant text-sm lg:text-base leading-relaxed mb-4 lg:mb-6 max-w-xl line-clamp-2">
+          <p className="max-sm:hidden font-body text-on_surface_variant text-sm lg:text-base leading-relaxed mb-4 lg:mb-6 max-w-xl line-clamp-2">
             {current.description}
           </p>
 

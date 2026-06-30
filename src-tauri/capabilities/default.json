@@ -18,6 +18,10 @@
     "allow-analyze-library",
     "allow-cancel-analysis",
     "allow-submit-markers",
+    "allow-organize-plan",
+    "allow-organize-execute",
+    "allow-organize-build-rule",
+    "dialog:allow-open",
     {
       "identifier": "shell:allow-execute",
       "allow": [

@@ -1,4 +1,5 @@
 pub mod analysis;
+pub mod organize;
 pub mod spatial_bridge;
 use spatial_bridge::{start_spatial_bridge, BridgeEvent};
 use tauri::{Manager, Emitter, Window};
@@ -75,6 +76,8 @@ pub fn run() {
     tauri::Builder::default()
         // Shell sidecars (ffmpeg, fpcalc) for the marker auto-detect pipeline.
         .plugin(tauri_plugin_shell::init())
+        // Native folder/file picker for the desktop "Organize downloads" tool.
+        .plugin(tauri_plugin_dialog::init())
         // Stub plugin so Tauri's ACL recognises "nativePlayer" — the actual
         // implementation lives in Kotlin (NativePlayerPlugin.kt) registered
         // via pluginManager.load() in MainActivity.
@@ -154,6 +157,9 @@ pub fn run() {
             analysis::commands::analyze_library,
             analysis::commands::cancel_analysis,
             analysis::commands::submit_markers,
+            organize::commands::organize_plan,
+            organize::commands::organize_execute,
+            organize::commands::organize_build_rule,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Butu");

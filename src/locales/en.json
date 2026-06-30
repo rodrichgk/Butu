@@ -15,7 +15,10 @@
     "title": "Settings",
     "language": "Language",
     "english": "English",
-    "french": "French"
+    "french": "French",
+    "library_tools": "Library tools",
+    "organize_label": "Organize downloads",
+    "organize_sub": "Sort a folder of downloaded TV/movies into your Plex/Jellyfin library"
   },
   "categories": {
     "cinema": "Cinema",

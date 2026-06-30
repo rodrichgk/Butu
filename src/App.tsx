@@ -14,6 +14,8 @@ import { MediaSetup } from "./components/MediaSetup";
 import { Landing } from "./components/Landing";
 import { SplashScreen } from "./components/SplashScreen";
 import { MarkerAutoDetectModal } from "./components/MarkerAutoDetectModal";
+import { OrganizeModal } from "./components/OrganizeModal";
+import { usePlatformBridge, PlatformContext } from "./hooks/usePlatformBridge";
 import { QRCodeSVG } from "qrcode.react";
 import { useSpatialCursor } from "./hooks/useSpatialCursor";
 import { useSpatialNavigation } from "./hooks/useSpatialNavigation";
@@ -1129,8 +1131,11 @@ function SettingsView() {
   const refreshLibrary    = useButuStore((s) => s.refreshLibrary);
   const isLoading         = useButuStore((s) => s.jellyfinLoading);
   const [showMarkerDetect, setShowMarkerDetect] = useState(false);
+  const [showOrganize, setShowOrganize] = useState(false);
   const [showDonate, setShowDonate] = useState(false);
   const [cleared, setCleared] = useState(false);
+  const { platform } = usePlatformBridge();
+  const isDesktopApp = platform === PlatformContext.DesktopTauri;
 
   const active = serverType === "plex" ? plexConfig : serverType === "jellyfin" ? jellyfinConfig : null;
   const serverLabel = serverType === "plex" ? "PLEX" : "JELLYFIN";
@@ -1210,6 +1215,14 @@ function SettingsView() {
           onClick={() => { clearWatchProgress(); setCleared(true); }} />
       </SettingSection>
 
+      {isDesktopApp && (
+        <SettingSection title={t("settings.library_tools", "LIBRARY TOOLS").toUpperCase()}>
+          <SettingRow label={t("settings.organize_label", "Organize downloads")} meta="HARDLINK"
+            sub={t("settings.organize_sub", "Sort a folder of downloaded TV/movies into your Plex/Jellyfin library")}
+            onClick={() => setShowOrganize(true)} />
+        </SettingSection>
+      )}
+
       <SettingSection title="COMPANION">
         <SettingRow label="Marker Auto-Detect" meta="INTROS + CREDITS"
           sub="Fingerprint your library and contribute markers to the Butu cloud DB"
@@ -1228,6 +1241,7 @@ function SettingsView() {
 
       <AnimatePresence>
         {showMarkerDetect && <MarkerAutoDetectModal onClose={() => setShowMarkerDetect(false)} />}
+        {showOrganize && <OrganizeModal onClose={() => setShowOrganize(false)} />}
         {showDonate && <DonateModal onClose={() => setShowDonate(false)} />}
       </AnimatePresence>
 

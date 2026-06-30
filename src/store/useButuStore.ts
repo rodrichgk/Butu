@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { MediaItem, PlayerState, CursorState, JellyfinConfig, PlexConfig, ServerType, WatchProgressEntry } from "../types";
+import { type OrganizeConfig, DEFAULT_ORGANIZE_CONFIG } from "../types/organize";
 
 const LS_JELLYFIN_KEY = "butu:jellyfin";
 
@@ -96,6 +97,16 @@ function loadSettings(): AppSettings {
   }
 }
 
+const LS_ORGANIZE_KEY = "butu:organize";
+function loadOrganizeConfig(): OrganizeConfig {
+  try {
+    const raw = localStorage.getItem(LS_ORGANIZE_KEY);
+    return raw ? { ...DEFAULT_ORGANIZE_CONFIG, ...JSON.parse(raw) } : DEFAULT_ORGANIZE_CONFIG;
+  } catch {
+    return DEFAULT_ORGANIZE_CONFIG;
+  }
+}
+
 interface ButuStore {
   cursor: CursorState;
   setCursor: (state: Partial<CursorState>) => void;
@@ -124,6 +135,10 @@ interface ButuStore {
 
   settings: AppSettings;
   updateSettings: (partial: Partial<AppSettings>) => void;
+
+  /** Desktop "Organize downloads" config (destinations + rules), persisted locally. */
+  organizeConfig: OrganizeConfig;
+  setOrganizeConfig: (cfg: OrganizeConfig) => void;
 
   /** Bumping this re-triggers the library load effect (used by "Reload library"). */
   libraryRefreshKey: number;
@@ -204,6 +219,12 @@ export const useButuStore = create<ButuStore>((set) => ({
       localStorage.setItem(LS_SETTINGS_KEY, JSON.stringify(next));
       return { settings: next };
     }),
+
+  organizeConfig: loadOrganizeConfig(),
+  setOrganizeConfig: (cfg) => {
+    localStorage.setItem(LS_ORGANIZE_KEY, JSON.stringify(cfg));
+    set({ organizeConfig: cfg });
+  },
 
   libraryRefreshKey: 0,
   refreshLibrary: () => set((s) => ({ libraryRefreshKey: s.libraryRefreshKey + 1 })),

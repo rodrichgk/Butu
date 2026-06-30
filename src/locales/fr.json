@@ -15,7 +15,10 @@
     "title": "Paramètres",
     "language": "Langue",
     "english": "Anglais",
-    "french": "Français"
+    "french": "Français",
+    "library_tools": "Outils de bibliothèque",
+    "organize_label": "Organiser les téléchargements",
+    "organize_sub": "Classez un dossier de séries/films téléchargés dans votre bibliothèque Plex/Jellyfin"
   },
   "categories": {
     "cinema": "Cinéma",

@@ -1,6 +1,6 @@
 {
   "name": "butu",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Butu — A high-performance, TV-optimized cinematic media client",
@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
     "clsx": "^2.1.0",
     "framer-motion": "^11.0.0",
     "hls.js": "^1.5.0",
