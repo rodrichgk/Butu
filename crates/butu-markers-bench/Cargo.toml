@@ -1,0 +1,22 @@
+[package]
+name = "butu-markers-bench"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Speed + accuracy benchmark harness (with network-latency simulation) for butu-markers."
+
+[dependencies]
+butu-markers = { path = "../butu-markers", features = ["process"] }
+tokio = { version = "1", features = ["full"] }
+futures-util = "0.3"
+hyper = { version = "1", features = ["server", "http1"] }
+http-body-util = "0.1"
+hyper-util = { version = "0.1", features = ["tokio"] }
+bytes = "1"
+percent-encoding = "2"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+async-trait = "0.1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
