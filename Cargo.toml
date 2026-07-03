@@ -1,0 +1,11 @@
+# Cargo workspace root. Members:
+#   src-tauri              — the Tauri desktop app (depends on butu-markers).
+#   crates/butu-markers    — the standalone, publishable intro/credits detector.
+#   crates/butu-markers-bench — dev-only speed+accuracy benchmark harness (not published).
+[workspace]
+resolver = "2"
+members = [
+    "src-tauri",
+    "crates/butu-markers",
+    "crates/butu-markers-bench",
+]

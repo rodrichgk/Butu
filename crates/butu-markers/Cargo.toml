@@ -1,0 +1,27 @@
+[package]
+name = "butu-markers"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "Cross-episode audio-fingerprint detection of TV intros and credits/outros."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/rodrichgk/butu"
+homepage = "https://github.com/rodrichgk/butu"
+readme = "README.md"
+keywords = ["intro", "credits", "chromaprint", "fingerprint", "video"]
+categories = ["multimedia::audio", "multimedia::video"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+async-trait = "0.1"
+futures-util = "0.3"
+tracing = "0.1"
+uuid = { version = "1", features = ["v4"] }
+tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
+
+[features]
+# Ships a std::process-based MediaRunner that spawns the ffmpeg/fpcalc binaries
+# directly (used by the benchmark harness and any non-Tauri consumer). The Tauri
+# app provides its own sidecar-based runner and does NOT enable this.
+process = ["tokio/process", "tokio/io-util", "tokio/rt-multi-thread"]

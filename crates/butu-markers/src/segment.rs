@@ -1,22 +1,21 @@
-//! Single-file marker detection for movies.
+//! Single-file / fallback marker detection via ffmpeg video analysis.
 //!
-//! Cross-episode audio fingerprinting (see [`crate::analysis::detect`]) needs
-//! sibling episodes to align against, which a movie doesn't have. So movies get
-//! a different, provider-agnostic pipeline:
+//! Cross-episode audio fingerprinting (see [`crate::detect`]) needs sibling
+//! episodes to align against, which a movie doesn't have — and some TV shows
+//! reuse no credits music, so fingerprinting finds nothing there either. Both
+//! cases fall back to provider-agnostic video analysis:
 //!
 //!   1. **Embedded chapters** (cheapest). If the container ships a chapter named
 //!      "Credits"/"Intro"/etc., trust it — it's authored, not guessed.
 //!   2. **Black-frame detection** (fallback). The final scene fades to black and
 //!      the credits roll to EOF; the last fade-to-black with a credits-length
 //!      tail after it is the credits start.
-//!
-//! Both shell out to the bundled `ffmpeg` sidecar.
+//!   3. **Fade refine.** Pulls a fingerprint-detected credits start back to where
+//!      the credits *visually* begin, via per-second luma sampling.
 
 use std::collections::HashMap;
 
-use tauri::AppHandle;
-use tauri_plugin_shell::process::CommandEvent;
-use tauri_plugin_shell::ShellExt;
+use crate::runner::MediaRunner;
 
 /// A detected (start, end) interval in ms within the file.
 #[derive(Debug, Clone, Copy)]
@@ -48,41 +47,20 @@ fn build_header_arg(headers: Option<&HashMap<String, String>>) -> Option<String>
         .filter(|s| !s.is_empty())
 }
 
-/// Runs the ffmpeg sidecar with `args`, returning (stdout, stderr_tail).
-async fn run_ffmpeg(app: &AppHandle, args: Vec<String>) -> Result<(Vec<u8>, String), String> {
-    let shell = app.shell();
-    let cmd = shell
-        .sidecar("ffmpeg")
-        .map_err(|e| format!("ffmpeg sidecar not found: {e}"))?
-        .args(&args);
-
-    let (mut rx, _child) = cmd.spawn().map_err(|e| format!("ffmpeg spawn: {e}"))?;
-
-    let mut stdout = Vec::new();
-    let mut stderr = String::new();
-    while let Some(event) = rx.recv().await {
-        match event {
-            CommandEvent::Stdout(bytes) => stdout.extend_from_slice(&bytes),
-            CommandEvent::Stderr(bytes) => {
-                // blackdetect logs to stderr; keep a generous tail.
-                if stderr.len() < 200_000 {
-                    stderr.push_str(&String::from_utf8_lossy(&bytes));
-                }
-            }
-            CommandEvent::Terminated(payload) => {
-                if payload.code.unwrap_or(1) != 0 {
-                    return Err(format!(
-                        "ffmpeg exited with code {:?}: {}",
-                        payload.code,
-                        stderr.chars().rev().take(500).collect::<String>()
-                    ));
-                }
-                break;
-            }
-            _ => {}
-        }
+/// Runs ffmpeg with `args`, returning (stdout, stderr) on a zero exit code.
+async fn run_ffmpeg(
+    runner: &dyn MediaRunner,
+    args: Vec<String>,
+) -> Result<(Vec<u8>, String), String> {
+    let out = runner.ffmpeg(&args).await?;
+    if out.code != 0 {
+        return Err(format!(
+            "ffmpeg exited with code {}: {}",
+            out.code,
+            out.stderr.chars().rev().take(500).collect::<String>()
+        ));
     }
-    Ok((stdout, stderr))
+    Ok((out.stdout, out.stderr))
 }
 
 // ─── Chapters ────────────────────────────────────────────────────────────────
@@ -91,7 +69,7 @@ async fn run_ffmpeg(app: &AppHandle, args: Vec<String>) -> Result<(Vec<u8>, Stri
 /// looks like an intro or credits chapter to a [`Span`]. Best-effort: any parse
 /// failure just yields an empty result so the caller falls back to blackdetect.
 pub async fn read_chapters(
-    app: &AppHandle,
+    runner: &dyn MediaRunner,
     stream_url: &str,
     headers: Option<&HashMap<String, String>>,
 ) -> ChapterMarkers {
@@ -113,7 +91,7 @@ pub async fn read_chapters(
         "-".into(),
     ]);
 
-    let (stdout, _) = match run_ffmpeg(app, args).await {
+    let (stdout, _) = match run_ffmpeg(runner, args).await {
         Ok(v) => v,
         Err(e) => {
             tracing::warn!("read_chapters ffmetadata failed: {e}");
@@ -217,18 +195,53 @@ fn parse_ffmetadata_chapters(text: &str) -> ChapterMarkers {
 /// Scans the tail of a movie for the fade-to-black that precedes the credit
 /// roll. Returns the (credits_start, EOF) span, or `None` if nothing credible.
 pub async fn detect_credits_blackframe(
-    app: &AppHandle,
+    runner: &dyn MediaRunner,
     stream_url: &str,
     headers: Option<&HashMap<String, String>>,
     duration_ms: u64,
+) -> Option<Span> {
+    // Scan the last ~quarter, clamped to [8 min, 20 min].
+    let duration_s = duration_ms / 1000;
+    let tail_len_s = (duration_s / 4).clamp(8 * 60, 20 * 60).min(duration_s);
+    blackframe_scan(runner, stream_url, headers, duration_ms, tail_len_s, true, "blackdetect").await
+}
+
+/// How far back from EOF the *fast* TV path scans for the credits fade. Episodic
+/// credits sit at the very tail (a few minutes), unlike a movie's long roll, so a
+/// tight window means far less video to decode than the 8–20 min movie scan.
+const FAST_TV_BLACKFRAME_TAIL_S: u64 = 6 * 60;
+
+/// Fast-pipeline TV credits fallback: like [`detect_credits_blackframe`] but scans
+/// only the last [`FAST_TV_BLACKFRAME_TAIL_S`] and drops `-hwaccel auto` (which,
+/// around a tiny `scale`+`blackdetect` CPU filter, only adds GPU upload/download —
+/// measured ~4.8× SLOWER on 1080p10 HEVC). Used when cross-episode fingerprinting
+/// finds no recurring end-theme (e.g. GoT).
+pub async fn detect_credits_blackframe_tv(
+    runner: &dyn MediaRunner,
+    stream_url: &str,
+    headers: Option<&HashMap<String, String>>,
+    duration_ms: u64,
+) -> Option<Span> {
+    let duration_s = duration_ms / 1000;
+    let tail_len_s = FAST_TV_BLACKFRAME_TAIL_S.min(duration_s);
+    blackframe_scan(runner, stream_url, headers, duration_ms, tail_len_s, false, "blackdetect (fast tv)").await
+}
+
+/// Shared black-frame scan: decode `tail_len_s` of video ending at EOF, run
+/// blackdetect, and return the latest fade that leaves a credits-length tail.
+async fn blackframe_scan(
+    runner: &dyn MediaRunner,
+    stream_url: &str,
+    headers: Option<&HashMap<String, String>>,
+    duration_ms: u64,
+    tail_len_s: u64,
+    hwaccel: bool,
+    log_label: &str,
 ) -> Option<Span> {
     if duration_ms < CREDITS_MIN_REMAINING_MS * 2 {
         return None;
     }
     let duration_s = duration_ms / 1000;
-
-    // Scan the last ~quarter, clamped to [8 min, 20 min].
-    let tail_len_s = (duration_s / 4).clamp(8 * 60, 20 * 60).min(duration_s);
     let tail_start_s = duration_s.saturating_sub(tail_len_s);
     let tail_start_ms = tail_start_s * 1000;
 
@@ -237,11 +250,13 @@ pub async fn detect_credits_blackframe(
         "-loglevel".into(),
         "info".into(), // blackdetect reports at info level
         "-nostdin".into(),
-        "-hwaccel".into(),
-        "auto".into(),
-        "-ss".into(),
-        tail_start_s.to_string(),
     ];
+    if hwaccel {
+        args.push("-hwaccel".into());
+        args.push("auto".into());
+    }
+    args.push("-ss".into());
+    args.push(tail_start_s.to_string());
     if let Some(h) = build_header_arg(headers) {
         args.push("-headers".into());
         args.push(h);
@@ -260,10 +275,10 @@ pub async fn detect_credits_blackframe(
         "-".into(),
     ]);
 
-    let (_, stderr) = match run_ffmpeg(app, args).await {
+    let (_, stderr) = match run_ffmpeg(runner, args).await {
         Ok(v) => v,
         Err(e) => {
-            tracing::warn!("blackdetect failed: {e}");
+            tracing::warn!("{log_label} failed: {e}");
             return None;
         }
     };
@@ -288,6 +303,163 @@ pub async fn detect_credits_blackframe(
         }
     }
     None
+}
+
+/// Luma (0–255) at/below this is the deep black the credit-roll background sits at
+/// (letterbox + black card). Footage — and even a dim final scene (~20–25) — reads
+/// higher; only the credit fade-in drops this low, so it anchors the roll start.
+const CREDIT_DEEP_LUMA: f64 = 20.0;
+/// Frames per second sampled for the credit-start scan (0.5 s resolution).
+const CREDIT_SCAN_FPS: u32 = 2;
+/// A deep-black run must last at least this many sampled frames (~3 s) to count as
+/// the credit fade-in — filters brief dark blips inside footage or a montage.
+const CREDIT_MIN_DEEP_FRAMES: usize = 6;
+/// Bridge this many bright frames inside a deep run (a name/logo flashing white).
+const CREDIT_DEEP_BRIDGE: usize = 1;
+/// A real credit fade-in bottoms out at the letterbox/black-card level (~15). A
+/// dark *scene* stays higher (~18–25), so a qualifying run must reach this deep —
+/// this is what separates the credits from a dark final scene.
+const CREDIT_VERY_DEEP_LUMA: f64 = 16.5;
+
+/// Finds where the visual credit roll begins, scanning a window just before the
+/// recurring end-theme (`theme_start_ms`). On many shows the credits roll over a
+/// unique-per-episode song for ~1 min *before* the recurring theme the fingerprint
+/// locks onto, so the theme start is a reliable but LATE credits mark. The real
+/// start is where sustained darkness (the credit roll) begins.
+///
+/// We sample per-frame luma over the window and walk BACK from the theme through
+/// the dark credit roll (tolerating a brief bright card) until sustained footage.
+/// A dark *scene* earlier in the episode is excluded because real footage sits
+/// between it and the credits and stops the walk-back. Returns the credit-roll
+/// start, or `None` when no dark roll of a plausible length sits before the theme
+/// (caller then keeps the reliable theme start — the "earliest reliable" hybrid).
+pub async fn find_credits_fade_before(
+    runner: &dyn MediaRunner,
+    stream_url: &str,
+    headers: Option<&HashMap<String, String>>,
+    theme_start_ms: u64,
+    max_song_ms: u64,
+    min_song_ms: u64,
+) -> Option<u64> {
+    let scan_start_ms = theme_start_ms.saturating_sub(max_song_ms + 5_000);
+    let start_s = scan_start_ms / 1000;
+    let len_s = theme_start_ms.saturating_sub(scan_start_ms) / 1000;
+    if len_s < 20 {
+        return None;
+    }
+
+    let mut args: Vec<String> = vec![
+        "-hide_banner".into(),
+        "-loglevel".into(),
+        "error".into(),
+        "-nostdin".into(),
+        "-ss".into(),
+        start_s.to_string(),
+    ];
+    if let Some(h) = build_header_arg(headers) {
+        args.push("-headers".into());
+        args.push(h);
+    }
+    args.extend([
+        "-i".into(),
+        stream_url.to_string(),
+        "-t".into(),
+        len_s.to_string(),
+        "-an".into(),
+        "-vf".into(),
+        format!("fps={CREDIT_SCAN_FPS},scale=64:36,signalstats,metadata=print:file=-"),
+        "-f".into(),
+        "null".into(),
+        "-".into(),
+    ]);
+
+    let (stdout, _) = run_ffmpeg(runner, args).await.ok()?;
+    let lumas = parse_yavg(&String::from_utf8_lossy(&stdout)); // (rel_s, luma)
+    let n = lumas.len();
+    if n < 10 {
+        return None;
+    }
+
+    // The credit roll begins with a fade-in to deep black. On some shows the roll
+    // then brightens (a photo montage over the song), so we do NOT require darkness
+    // to be contiguous back to the theme. Instead find the longest deep-black run
+    // whose start sits in the plausible window — that solid black block is the
+    // fade-in at the roll's start, robust to whatever the credits do afterwards.
+    let mut runs: Vec<(usize, usize)> = Vec::new(); // (start_idx, end_idx)
+    let mut run_start: Option<usize> = None;
+    let mut last_deep = 0usize;
+    for k in 0..n {
+        if lumas[k].1 <= CREDIT_DEEP_LUMA {
+            if run_start.is_none() {
+                run_start = Some(k);
+            }
+            last_deep = k;
+        } else if let Some(s) = run_start {
+            if k - last_deep > CREDIT_DEEP_BRIDGE {
+                runs.push((s, last_deep));
+                run_start = None;
+            }
+        }
+    }
+    if let Some(s) = run_start {
+        runs.push((s, last_deep));
+    }
+
+    let lo_ms = theme_start_ms.saturating_sub(max_song_ms);
+    let hi_ms = theme_start_ms.saturating_sub(min_song_ms);
+    let deep = runs
+        .into_iter()
+        .filter(|&(s, e)| e + 1 - s >= CREDIT_MIN_DEEP_FRAMES)
+        .filter(|&(s, e)| lumas[s..=e].iter().any(|&(_, l)| l <= CREDIT_VERY_DEEP_LUMA))
+        .map(|(s, e)| (scan_start_ms + (lumas[s].0 * 1000.0) as u64, e + 1 - s))
+        .filter(|&(sm, _)| (lo_ms..=hi_ms).contains(&sm))
+        .max_by_key(|&(_, len)| len)
+        .map(|(sm, _)| sm);
+    if deep.is_some() {
+        return deep;
+    }
+
+    // Fallback for bright/colored credits (e.g. Euphoria's ~68-luma background):
+    // there's no deep black, but the footage→credits transition is still a big,
+    // SUSTAINED luma step-down. Find the last such step whose tail stays low to the
+    // theme — that's the credit-roll start.
+    credit_step_down(&lumas, scan_start_ms, lo_ms, hi_ms)
+}
+
+/// Minimum footage→credits luma drop for the bright-credits fallback, the
+/// averaging half-window (frames), and the fraction of the post-drop tail that
+/// must stay below the footage level to accept it as the credit roll.
+const CREDIT_STEP_MIN: f64 = 40.0;
+const CREDIT_STEP_W: usize = 4;
+const CREDIT_STEP_BELOW_FRAC: f64 = 0.8;
+
+fn credit_step_down(lumas: &[(f64, f64)], scan_start_ms: u64, lo_ms: u64, hi_ms: u64) -> Option<u64> {
+    let n = lumas.len();
+    let w = CREDIT_STEP_W;
+    if n < 2 * w + 1 {
+        return None;
+    }
+    let mut best: Option<u64> = None;
+    for k in w..(n - w) {
+        let mb = lumas[k - w..k].iter().map(|&(_, l)| l).sum::<f64>() / w as f64;
+        let ma = lumas[k..k + w].iter().map(|&(_, l)| l).sum::<f64>() / w as f64;
+        if mb - ma < CREDIT_STEP_MIN {
+            continue;
+        }
+        let sm = scan_start_ms + (lumas[k].0 * 1000.0) as u64;
+        if !(lo_ms..=hi_ms).contains(&sm) {
+            continue;
+        }
+        // The credit roll stays below the footage level from here to the theme; a
+        // mere scene cut has footage return bright, failing this.
+        let floor = mb - CREDIT_STEP_MIN * 0.5;
+        let tail = &lumas[k..];
+        let below = tail.iter().filter(|&&(_, l)| l < floor).count() as f64 / tail.len() as f64;
+        if below >= CREDIT_STEP_BELOW_FRAC {
+            best = Some(sm); // latest qualifying wins (k ascends)
+        }
+    }
+    best
 }
 
 /// Average luma (0–255) above this is episode footage; credits (white text on
@@ -320,11 +492,36 @@ const MAX_PULLBACK_MS: u64 = 200_000;
 /// avoid a false-early Up-Next during the episode. Returns `None` to keep the
 /// fingerprint start.
 pub async fn find_credits_fade_in_range(
-    app: &AppHandle,
+    runner: &dyn MediaRunner,
     stream_url: &str,
     headers: Option<&HashMap<String, String>>,
     search_start_ms: u64,
     music_start_ms: u64,
+) -> Option<u64> {
+    find_credits_fade_impl(runner, stream_url, headers, search_start_ms, music_start_ms, true).await
+}
+
+/// Fast-pipeline fade refine: identical to [`find_credits_fade_in_range`] but
+/// without `-hwaccel auto`. Measured on real 1080p10 HEVC episodes, hwaccel
+/// decodes this pass ~4.5× SLOWER — the GPU round-trip around the tiny CPU
+/// `scale`+`signalstats` filter costs far more than it saves.
+pub async fn find_credits_fade_in_range_fast(
+    runner: &dyn MediaRunner,
+    stream_url: &str,
+    headers: Option<&HashMap<String, String>>,
+    search_start_ms: u64,
+    music_start_ms: u64,
+) -> Option<u64> {
+    find_credits_fade_impl(runner, stream_url, headers, search_start_ms, music_start_ms, false).await
+}
+
+async fn find_credits_fade_impl(
+    runner: &dyn MediaRunner,
+    stream_url: &str,
+    headers: Option<&HashMap<String, String>>,
+    search_start_ms: u64,
+    music_start_ms: u64,
+    hwaccel: bool,
 ) -> Option<u64> {
     if music_start_ms <= search_start_ms {
         return None;
@@ -340,11 +537,13 @@ pub async fn find_credits_fade_in_range(
         "-loglevel".into(),
         "error".into(),
         "-nostdin".into(),
-        "-hwaccel".into(),
-        "auto".into(),
-        "-ss".into(),
-        start_s.to_string(),
     ];
+    if hwaccel {
+        args.push("-hwaccel".into());
+        args.push("auto".into());
+    }
+    args.push("-ss".into());
+    args.push(start_s.to_string());
     if let Some(h) = build_header_arg(headers) {
         args.push("-headers".into());
         args.push(h);
@@ -363,7 +562,7 @@ pub async fn find_credits_fade_in_range(
         "-".into(),
     ]);
 
-    let (stdout, _) = match run_ffmpeg(app, args).await {
+    let (stdout, _) = match run_ffmpeg(runner, args).await {
         Ok(v) => v,
         Err(e) => {
             tracing::warn!("find_credits_fade_in_range pass failed: {e}");

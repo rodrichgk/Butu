@@ -223,7 +223,7 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
       }
       showsRef.current = shows;
       showProgressTotal.current = shows.length;
-      await runAnalysis(shows);  // long-running; events drive the UI
+      await runAnalysis(shows);  // long-running (fast pipeline); events drive the UI
     } catch (e: any) {
       if (abort.signal.aborted) return;
       // Keep the technical breakdown in the console for debugging; show a

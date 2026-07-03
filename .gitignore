@@ -5,8 +5,10 @@ node_modules/
 dist/
 dist-ssr/
 
-# Tauri build output
+# Tauri / Cargo build output
 src-tauri/target/
+# Cargo workspace target dir (root) — introduced with the crates/ workspace
+/target/
 
 # Environment & secrets
 .env

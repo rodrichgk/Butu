@@ -1,17 +1,16 @@
-//! fpcalc (chromaprint) sidecar invocation.
+//! fpcalc (chromaprint) invocation.
 //!
-//! `fpcalc` reads our raw mono 22050 Hz s16le PCM file and emits a chromaprint:
-//! a sequence of 32-bit unsigned integers, one every ~0.124 s. Comparing two
-//! chromaprints under Hamming distance is the standard "is this the same
-//! audio?" primitive — what AcoustID uses for music ID, and what Jellyfin's
-//! IntroSkipper uses to align intros.
+//! `fpcalc` reads our raw mono s16le PCM file and emits a chromaprint: a sequence
+//! of 32-bit unsigned integers, one every ~0.124 s. Comparing two chromaprints
+//! under Hamming distance is the standard "is this the same audio?" primitive —
+//! what AcoustID uses for music ID, and what Jellyfin's IntroSkipper uses to
+//! align intros.
 
 use std::path::Path;
 
 use serde::Deserialize;
-use tauri::AppHandle;
-use tauri_plugin_shell::process::CommandEvent;
-use tauri_plugin_shell::ShellExt;
+
+use crate::runner::MediaRunner;
 
 #[derive(Deserialize)]
 struct FpcalcRawOut {
@@ -48,11 +47,31 @@ impl Fingerprint {
 /// default base64 encoding), `-json` is parsed below. Limits scan to
 /// `max_seconds` so we don't fingerprint more than the window we care about.
 pub async fn fingerprint_pcm(
-    app: &AppHandle,
+    runner: &dyn MediaRunner,
     pcm_path: &Path,
     max_seconds: u32,
 ) -> Result<Fingerprint, String> {
-    let shell = app.shell();
+    fingerprint_pcm_rate(
+        runner,
+        pcm_path,
+        max_seconds,
+        crate::audio::SAMPLE_RATE,
+        crate::audio::CHANNELS,
+    )
+    .await
+}
+
+/// Same as [`fingerprint_pcm`] but with an explicit input sample rate + channel
+/// count, so the fast pipeline can feed 11025 Hz PCM without a second constant
+/// path. The `-rate`/`-channels` hints MUST match how the PCM was decoded, or
+/// fpcalc mis-frames the audio and the hashes shift.
+pub async fn fingerprint_pcm_rate(
+    runner: &dyn MediaRunner,
+    pcm_path: &Path,
+    max_seconds: u32,
+    rate: u32,
+    channels: u8,
+) -> Result<Fingerprint, String> {
     let args: Vec<String> = vec![
         "-raw".into(),
         "-json".into(),
@@ -60,47 +79,21 @@ pub async fn fingerprint_pcm(
         max_seconds.to_string(),
         // fpcalc autodetects format for known containers; raw PCM needs explicit hints.
         "-rate".into(),
-        crate::analysis::audio::SAMPLE_RATE.to_string(),
+        rate.to_string(),
         "-channels".into(),
-        crate::analysis::audio::CHANNELS.to_string(),
+        channels.to_string(),
         "-format".into(),
         "s16le".into(),
         pcm_path.to_string_lossy().into_owned(),
     ];
 
-    let cmd = shell
-        .sidecar("fpcalc")
-        .map_err(|e| format!("fpcalc sidecar not found: {e}"))?
-        .args(&args);
-
-    let (mut rx, _child) = cmd.spawn().map_err(|e| format!("fpcalc spawn: {e}"))?;
-
-    let mut stdout = Vec::new();
-    let mut stderr_tail = String::new();
-    while let Some(event) = rx.recv().await {
-        match event {
-            CommandEvent::Stdout(bytes) => stdout.extend_from_slice(&bytes),
-            CommandEvent::Stderr(bytes) => {
-                if stderr_tail.len() < 2_000 {
-                    stderr_tail.push_str(&String::from_utf8_lossy(&bytes));
-                }
-            }
-            CommandEvent::Terminated(payload) => {
-                if payload.code.unwrap_or(1) != 0 {
-                    return Err(format!(
-                        "fpcalc exited with code {:?}: {}",
-                        payload.code,
-                        stderr_tail.trim()
-                    ));
-                }
-                break;
-            }
-            _ => {}
-        }
+    let out = runner.fpcalc(&args).await?;
+    if out.code != 0 {
+        return Err(format!("fpcalc exited with code {}: {}", out.code, out.stderr.trim()));
     }
 
-    let parsed: FpcalcRawOut = serde_json::from_slice(&stdout)
-        .map_err(|e| format!("fpcalc json parse: {e}; output={:?}", String::from_utf8_lossy(&stdout)))?;
+    let parsed: FpcalcRawOut = serde_json::from_slice(&out.stdout)
+        .map_err(|e| format!("fpcalc json parse: {e}; output={:?}", String::from_utf8_lossy(&out.stdout)))?;
 
     if parsed.fingerprint.is_empty() {
         return Err("fpcalc returned empty fingerprint".into());

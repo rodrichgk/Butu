@@ -9,8 +9,24 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, State};
 use tokio::sync::Mutex;
 
-use crate::analysis::pipeline::{analyze, CancelFlag};
-use crate::analysis::types::{EpisodeResult, ShowInput};
+use butu_markers::{
+    analyze, analyze_fast, CancelFlag, EpisodeResult, MediaRunner, ProgressSink, ShowInput,
+    DEFAULT_CONCURRENCY,
+};
+
+use crate::analysis::tauri_runner::{TauriRunner, TauriSink};
+
+/// Which detection algorithm to run. `Fast` is the default and the only one the
+/// UI selects — it's the concurrent, remote-optimized pipeline with the accurate
+/// credit-fade detection. `Legacy` is kept (callable via the API) for reference /
+/// A/B benchmarking but is otherwise unused.
+#[derive(Debug, Clone, Copy, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Analyzer {
+    Legacy,
+    #[default]
+    Fast,
+}
 
 /// Shared state held in Tauri's `manage` slot so the cancel command can flip
 /// the flag on a running analysis. Also stores the latest result set so the UI
@@ -24,6 +40,12 @@ pub struct AnalysisState {
 #[derive(Debug, Deserialize)]
 pub struct AnalyzeArgs {
     pub shows: Vec<ShowInput>,
+    /// `"legacy"` (default) or `"fast"`. Omitted by older UI builds → legacy.
+    #[serde(default)]
+    pub algorithm: Analyzer,
+    /// Only used by the fast pipeline. `None` → [`DEFAULT_CONCURRENCY`].
+    #[serde(default)]
+    pub concurrency: Option<usize>,
 }
 
 #[derive(Debug, Serialize)]
@@ -48,8 +70,18 @@ pub async fn analyze_library(
     // Snapshot the cancel handle so we can hand it to the spawned task.
     let cancel = state.cancel_flag.lock().await.as_ref().cloned().unwrap();
 
-    let app_clone = app.clone();
-    let results = analyze(app_clone, args.shows, cancel).await;
+    // The crate is host-agnostic; wrap Tauri's sidecar shell + event emitter in
+    // the runner/sink adapters it expects.
+    let runner: Arc<dyn MediaRunner> = Arc::new(TauriRunner::new(app.clone()));
+    let sink: Arc<dyn ProgressSink> = Arc::new(TauriSink::new(app.clone()));
+
+    let results = match args.algorithm {
+        Analyzer::Legacy => analyze(runner, sink, args.shows, cancel).await,
+        Analyzer::Fast => {
+            let concurrency = args.concurrency.unwrap_or(DEFAULT_CONCURRENCY);
+            analyze_fast(runner, sink, args.shows, cancel, concurrency).await
+        }
+    };
 
     // Whatever the outcome, clear the cancel flag so a new run can start.
     *state.cancel_flag.lock().await = None;

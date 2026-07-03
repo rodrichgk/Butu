@@ -1,19 +1,10 @@
-//! Library-wide intro/credits auto-detection.
+//! Tauri adapter around the standalone [`butu_markers`] detector crate.
 //!
-//! Pipeline:
-//!     library → per show → per season → for each ep:
-//!         ffmpeg sidecar decodes a chunk of audio to mono 22050 Hz raw PCM
-//!         fpcalc sidecar fingerprints it (chromaprint)
-//!     detect.rs aligns the fingerprints across the season's episodes;
-//!     the longest interval where ≥half of episode-pairs agree is the marker.
-//!
-//! The Tauri commands in [`commands`] expose the pipeline to the React UI and
-//! emit progress events the modal listens to.
+//! The detection algorithm itself now lives in `crates/butu-markers` (host- and
+//! Tauri-agnostic, publishable). This module only wires it into the app:
+//! [`commands`] exposes the Tauri commands the React UI calls, and
+//! [`tauri_runner`] implements the crate's `MediaRunner` + `ProgressSink` traits
+//! over the bundled ffmpeg/fpcalc sidecars and `app.emit`.
 
-pub mod audio;
 pub mod commands;
-pub mod detect;
-pub mod fingerprint;
-pub mod pipeline;
-pub mod segment;
-pub mod types;
+mod tauri_runner;

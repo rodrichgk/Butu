@@ -303,10 +303,21 @@ export async function buildShowInputs(
 
 // ─── Tauri commands ──────────────────────────────────────────────────────────
 
-export async function runAnalysis(shows: ShowInput[]): Promise<AnalyzeResponse> {
+/** Which Rust detection pipeline to run. `"legacy"` is the original algorithm;
+ *  `"fast"` is the concurrent, remote-stream-optimized variant kept alongside it
+ *  for A/B comparison. */
+export type Analyzer = "legacy" | "fast";
+
+export async function runAnalysis(
+  shows: ShowInput[],
+  algorithm: Analyzer = "fast",
+  concurrency?: number,
+): Promise<AnalyzeResponse> {
   const core = tauriCore();
   if (!core) throw new Error("Not running inside the Tauri companion app");
-  return await core.invoke("analyze_library", { args: { shows } });
+  return await core.invoke("analyze_library", {
+    args: { shows, algorithm, concurrency },
+  });
 }
 
 export async function cancelAnalysis(): Promise<void> {

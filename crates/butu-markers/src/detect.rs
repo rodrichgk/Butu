@@ -26,7 +26,7 @@
 //! ms offsets into the *window* that was decoded.
 
 use std::collections::{HashMap, HashSet};
-use crate::analysis::fingerprint::Fingerprint;
+use crate::fingerprint::Fingerprint;
 
 /// Per-hash Hamming distance for *measuring* a run. Transcoded audio puts the
 /// same music ~10-11 bits apart, so 12 recovers the full match while staying
@@ -156,13 +156,13 @@ struct Match {
 fn has_sufficient_entropy(slice: &[u32]) -> bool {
     let len = slice.len();
     if len == 0 { return false; }
-    
+
     // Count unique hashes
     let mut unique = HashSet::new();
     for &h in slice {
         unique.insert(h);
     }
-    
+
     // If fewer than 5% of the hashes are unique, it's almost certainly silence/noise.
     let unique_ratio = unique.len() as f32 / len as f32;
     unique_ratio > 0.05

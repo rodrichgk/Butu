@@ -1,4 +1,4 @@
-//! Shared types between Rust pipeline + JS UI.
+//! Shared types for the detector pipeline (also serialized to the app's JS UI).
 
 use serde::{Deserialize, Serialize};
 
@@ -28,7 +28,7 @@ pub struct ShowInput {
     /// `tmdb://1399` etc. We submit using the first id that parses cleanly.
     pub external_ids: Vec<String>,
     /// TV shows use cross-episode fingerprint alignment; movies have no siblings
-    /// and instead use the black-frame/chapter detector in [`crate::analysis::segment`].
+    /// and instead use the black-frame/chapter detector in [`crate::segment`].
     #[serde(default)]
     pub kind: MediaKind,
     pub seasons: Vec<SeasonInput>,
@@ -47,7 +47,7 @@ pub struct DetectedMarker {
     pub end_ms: u64,
 }
 
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum MarkerType {
     Intro,
@@ -80,7 +80,7 @@ pub enum ProgressEvent {
     Failed { message: String },
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EpisodeStage {
     Decoding,
