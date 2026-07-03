@@ -85,3 +85,87 @@ export async function fetchCloudMarkers(item: MediaItem, ep?: Episode): Promise<
     return [];
   }
 }
+
+// ─── IntroDB (primary source) ──────────────────────────────────────────────────
+// introdb.app is a public crowd DB of hand-verified per-episode intro/outro
+// timestamps keyed by IMDb id. We prefer it over the Butu cloud DB because its
+// visual credit-roll starts are human-marked (audio fingerprinting can only find
+// the recurring end-theme, which starts well after the credits visually begin).
+
+const INTRODB_SEGMENTS = "https://api.introdb.app/segments";
+const TVMAZE_SINGLE = "https://api.tvmaze.com/singlesearch/shows";
+
+// Resolved IMDb ids by lowercased show title, so we hit TVMaze at most once/show.
+const imdbCache = new Map<string, string | null>();
+
+function tauriCore(): any {
+  const w = window as any;
+  return w.__TAURI__?.core ?? w.__TAURI_INTERNALS__;
+}
+
+// GET JSON through the Tauri proxy (dodges CORS, carries the desktop's network),
+// falling back to plain fetch in a browser. Returns null on any non-2xx / error.
+async function httpGetJson(url: string): Promise<any | null> {
+  try {
+    const core = tauriCore();
+    if (core?.invoke) {
+      const text = (await core.invoke("fetch_plex", { url, headers: {} })) as string;
+      return JSON.parse(text);
+    }
+    const res = await fetch(url);
+    return res.ok ? await res.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+function imdbFromExtIds(ids: string[]): string | null {
+  for (const id of ids) if (id.startsWith("imdb://")) return id.slice("imdb://".length);
+  return null;
+}
+
+async function resolveImdbId(item: MediaItem, ep?: Episode): Promise<string | null> {
+  const ext = ep?.externalIds?.length ? ep.externalIds : item.externalIds || [];
+  const direct = imdbFromExtIds(ext);
+  if (direct) return direct;
+
+  const title = item.title?.trim();
+  if (!title) return null;
+  const key = title.toLowerCase();
+  if (imdbCache.has(key)) return imdbCache.get(key)!;
+
+  const data = await httpGetJson(`${TVMAZE_SINGLE}?q=${encodeURIComponent(title)}`);
+  const imdb = (data?.externals?.imdb as string | undefined) ?? null;
+  imdbCache.set(key, imdb);
+  return imdb;
+}
+
+export async function fetchIntroDbMarkers(item: MediaItem, ep?: Episode): Promise<CloudMarker[]> {
+  const imdb = await resolveImdbId(item, ep);
+  if (!imdb) return [];
+  const season = ep?.season ?? item.season ?? 1;
+  const episode = ep?.episode ?? item.episode ?? 1;
+
+  const url = `${INTRODB_SEGMENTS}?imdb_id=${encodeURIComponent(imdb)}&season=${season}&episode=${episode}`;
+  const d = await httpGetJson(url);
+  if (!d) return [];
+
+  const out: CloudMarker[] = [];
+  if (d.intro?.start_ms != null) out.push({ type: "intro", startMs: d.intro.start_ms, endMs: d.intro.end_ms });
+  if (d.outro?.start_ms != null) out.push({ type: "credits", startMs: d.outro.start_ms, endMs: d.outro.end_ms });
+  return out;
+}
+
+/**
+ * Marker lookup for playback. IntroDB is the primary (accurate, hand-verified)
+ * source; the Butu cloud DB (fingerprint-detected + seed markers) fills in any
+ * marker type IntroDB doesn't cover for this episode.
+ */
+export async function fetchMarkers(item: MediaItem, ep?: Episode): Promise<CloudMarker[]> {
+  const [introdb, cloud] = await Promise.all([
+    fetchIntroDbMarkers(item, ep).catch(() => [] as CloudMarker[]),
+    fetchCloudMarkers(item, ep).catch(() => [] as CloudMarker[]),
+  ]);
+  const covered = new Set(introdb.map((m) => m.type));
+  return [...introdb, ...cloud.filter((m) => !covered.has(m.type))];
+}

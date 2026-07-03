@@ -8,7 +8,7 @@ import {
   reportStopped,
   secondsToTicks,
 } from "../services/jellyfinApi";
-import { fetchCloudMarkers, CloudMarker } from "../services/markerService";
+import { fetchMarkers, CloudMarker } from "../services/markerService";
 import { fetchPlexSubtitleTracks, applyPlexSubtitle, type PlexSubtitleTrack } from "../services/plexApi";
 import { useTranslation } from "react-i18next";
 import { isTouch } from "../utils/platform";
@@ -83,7 +83,7 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
 
   useEffect(() => {
     let ep = item.episodes?.find((e) => e.season === item.season && e.episode === item.episode);
-    fetchCloudMarkers(item, ep).then((fetched) => setMarkers(fetched));
+    fetchMarkers(item, ep).then((fetched) => setMarkers(fetched));
   }, [item]);
 
   // Load the item's subtitle tracks (Plex desktop only) so the CC menu can list them.
