@@ -1,4 +1,5 @@
 import { MediaItem, Episode } from "../types";
+import { proxyGetJson } from "./tauri";
 
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL as string | undefined;
 const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -95,29 +96,22 @@ export async function fetchCloudMarkers(item: MediaItem, ep?: Episode): Promise<
 const INTRODB_SEGMENTS = "https://api.introdb.app/segments";
 const TVMAZE_SINGLE = "https://api.tvmaze.com/singlesearch/shows";
 
+interface TvMazeShow {
+  externals?: { imdb?: string | null };
+}
+interface IntroDbSeg {
+  start_ms: number;
+  end_ms: number;
+}
+interface IntroDbSegments {
+  intro?: IntroDbSeg | null;
+  outro?: IntroDbSeg | null;
+}
+
 // Resolved IMDb ids by lowercased show title, so we hit TVMaze at most once/show.
 const imdbCache = new Map<string, string | null>();
-
-function tauriCore(): any {
-  const w = window as any;
-  return w.__TAURI__?.core ?? w.__TAURI_INTERNALS__;
-}
-
-// GET JSON through the Tauri proxy (dodges CORS, carries the desktop's network),
-// falling back to plain fetch in a browser. Returns null on any non-2xx / error.
-async function httpGetJson(url: string): Promise<any | null> {
-  try {
-    const core = tauriCore();
-    if (core?.invoke) {
-      const text = (await core.invoke("fetch_plex", { url, headers: {} })) as string;
-      return JSON.parse(text);
-    }
-    const res = await fetch(url);
-    return res.ok ? await res.json() : null;
-  } catch {
-    return null;
-  }
-}
+// Per-episode IntroDB results, so re-opening an episode doesn't re-hit the API.
+const segmentsCache = new Map<string, CloudMarker[]>();
 
 function imdbFromExtIds(ids: string[]): string | null {
   for (const id of ids) if (id.startsWith("imdb://")) return id.slice("imdb://".length);
@@ -132,10 +126,11 @@ async function resolveImdbId(item: MediaItem, ep?: Episode): Promise<string | nu
   const title = item.title?.trim();
   if (!title) return null;
   const key = title.toLowerCase();
-  if (imdbCache.has(key)) return imdbCache.get(key)!;
+  const cached = imdbCache.get(key);
+  if (cached !== undefined) return cached;
 
-  const data = await httpGetJson(`${TVMAZE_SINGLE}?q=${encodeURIComponent(title)}`);
-  const imdb = (data?.externals?.imdb as string | undefined) ?? null;
+  const data = await proxyGetJson<TvMazeShow>(`${TVMAZE_SINGLE}?q=${encodeURIComponent(title)}`);
+  const imdb = data?.externals?.imdb ?? null;
   imdbCache.set(key, imdb);
   return imdb;
 }
@@ -146,13 +141,18 @@ export async function fetchIntroDbMarkers(item: MediaItem, ep?: Episode): Promis
   const season = ep?.season ?? item.season ?? 1;
   const episode = ep?.episode ?? item.episode ?? 1;
 
+  const cacheKey = `${imdb}|${season}|${episode}`;
+  const cached = segmentsCache.get(cacheKey);
+  if (cached) return cached;
+
   const url = `${INTRODB_SEGMENTS}?imdb_id=${encodeURIComponent(imdb)}&season=${season}&episode=${episode}`;
-  const d = await httpGetJson(url);
-  if (!d) return [];
+  const d = await proxyGetJson<IntroDbSegments>(url);
 
   const out: CloudMarker[] = [];
-  if (d.intro?.start_ms != null) out.push({ type: "intro", startMs: d.intro.start_ms, endMs: d.intro.end_ms });
-  if (d.outro?.start_ms != null) out.push({ type: "credits", startMs: d.outro.start_ms, endMs: d.outro.end_ms });
+  if (d?.intro?.start_ms != null) out.push({ type: "intro", startMs: d.intro.start_ms, endMs: d.intro.end_ms });
+  if (d?.outro?.start_ms != null) out.push({ type: "credits", startMs: d.outro.start_ms, endMs: d.outro.end_ms });
+  // Cache even an empty result (episode genuinely uncovered) to avoid re-querying.
+  if (d) segmentsCache.set(cacheKey, out);
   return out;
 }
 

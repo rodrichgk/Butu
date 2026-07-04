@@ -11,6 +11,7 @@
 import { fetchPlexEpisodes, fetchPlexSeasons, fetchPlexShowGuids, plexStreamUrl } from "./plexApi";
 import { fetchJellyfinEpisodes, fetchJellyfinSeasons, streamUrl as jellyfinStreamUrl } from "./jellyfinApi";
 import type { PlexConfig, JellyfinConfig, MediaItem } from "../types";
+import { invoke, tauriListen, proxyGetJson } from "./tauri";
 
 // ─── Public types ────────────────────────────────────────────────────────────
 
@@ -63,22 +64,8 @@ export type ProgressEvent =
 export interface AnalyzeResponse { episode_count: number; }
 export interface SubmitResponse { inserted: number; episode_count: number; }
 
-// ─── Tauri bridge helpers ────────────────────────────────────────────────────
-
-// usePlatformBridge.ts already augments Window with `__TAURI__`; we just read
-// from it via `any` casts so we don't conflict with that file's typing.
-function tauriCore(): any {
-  const w = window as any;
-  return w.__TAURI__?.core ?? w.__TAURI_INTERNALS__;
-}
-
-function tauriEvent(): any {
-  return (window as any).__TAURI__?.event;
-}
-
-export function isTauri(): boolean {
-  return tauriCore() != null && tauriEvent() != null;
-}
+// Tauri bridge helpers live in ./tauri; re-exported here for existing importers.
+export { isTauri } from "./tauri";
 
 // ─── Library → ShowInput ────────────────────────────────────────────────────
 
@@ -154,19 +141,9 @@ export async function buildShowInputs(
       try {
         await new Promise((r) => setTimeout(r, 600)); // Respect TVMaze rate limit (20 req / 10s)
         const url = `https://api.tvmaze.com/singlesearch/shows?q=${encodeURIComponent(item.title)}`;
-        
-        let data: any = null;
-        const core = tauriCore();
-        if (core?.invoke) {
-          const text = await core.invoke("fetch_plex", { url, headers: {} }) as string;
-          data = JSON.parse(text);
-        } else {
-          const res = await fetch(url);
-          if (res.ok) {
-            data = await res.json();
-          }
-        }
-        
+
+        const data = await proxyGetJson<{ externals?: { thetvdb?: number; imdb?: string } }>(url);
+
         if (data && data.externals) {
           if (data.externals.thetvdb) externalIds.push(`tvdb://${data.externals.thetvdb}`);
           if (data.externals.imdb) externalIds.push(`imdb://${data.externals.imdb}`);
@@ -313,17 +290,17 @@ export async function runAnalysis(
   algorithm: Analyzer = "fast",
   concurrency?: number,
 ): Promise<AnalyzeResponse> {
-  const core = tauriCore();
-  if (!core) throw new Error("Not running inside the Tauri companion app");
-  return await core.invoke("analyze_library", {
+  return await invoke<AnalyzeResponse>("analyze_library", {
     args: { shows, algorithm, concurrency },
   });
 }
 
 export async function cancelAnalysis(): Promise<void> {
-  const core = tauriCore();
-  if (!core) return;
-  try { await core.invoke("cancel_analysis"); } catch { /* ignore */ }
+  try {
+    await invoke("cancel_analysis");
+  } catch {
+    /* not in Tauri, or nothing running */
+  }
 }
 
 export interface SubmitArgs {
@@ -334,19 +311,12 @@ export interface SubmitArgs {
 }
 
 export async function submitDetectedMarkers(args: SubmitArgs): Promise<SubmitResponse> {
-  const core = tauriCore();
-  if (!core) throw new Error("Not running inside the Tauri companion app");
-  return await core.invoke("submit_markers", { args });
+  return await invoke<SubmitResponse>("submit_markers", { args });
 }
 
 /** Subscribes to `analysis-progress`. Returns the unsubscribe fn. */
 export async function subscribeProgress(
   cb: (ev: ProgressEvent) => void,
 ): Promise<() => void> {
-  const ev = tauriEvent();
-  if (!ev) return () => {};
-  const unlisten = await ev.listen("analysis-progress", (event: { payload: ProgressEvent }) => {
-    cb(event.payload);
-  });
-  return () => { try { unlisten(); } catch { /* ignore */ } };
+  return tauriListen<ProgressEvent>("analysis-progress", cb);
 }
