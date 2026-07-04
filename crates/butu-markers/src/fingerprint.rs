@@ -89,11 +89,19 @@ pub async fn fingerprint_pcm_rate(
 
     let out = runner.fpcalc(&args).await?;
     if out.code != 0 {
-        return Err(format!("fpcalc exited with code {}: {}", out.code, out.stderr.trim()));
+        return Err(format!(
+            "fpcalc exited with code {}: {}",
+            out.code,
+            out.stderr.trim()
+        ));
     }
 
-    let parsed: FpcalcRawOut = serde_json::from_slice(&out.stdout)
-        .map_err(|e| format!("fpcalc json parse: {e}; output={:?}", String::from_utf8_lossy(&out.stdout)))?;
+    let parsed: FpcalcRawOut = serde_json::from_slice(&out.stdout).map_err(|e| {
+        format!(
+            "fpcalc json parse: {e}; output={:?}",
+            String::from_utf8_lossy(&out.stdout)
+        )
+    })?;
 
     if parsed.fingerprint.is_empty() {
         return Err("fpcalc returned empty fingerprint".into());

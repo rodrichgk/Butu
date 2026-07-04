@@ -129,34 +129,43 @@ async fn serve(
 
     let mut file = match tokio::fs::File::open(&path).await {
         Ok(f) => f,
-        Err(_) => return Ok(text_response(StatusCode::INTERNAL_SERVER_ERROR, "open failed")),
+        Err(_) => {
+            return Ok(text_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "open failed",
+            ))
+        }
     };
     if file.seek(SeekFrom::Start(start)).await.is_err() {
-        return Ok(text_response(StatusCode::INTERNAL_SERVER_ERROR, "seek failed"));
+        return Ok(text_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "seek failed",
+        ));
     }
 
     let bandwidth = throttle.bandwidth_bps;
-    let stream = futures_util::stream::unfold((file, len), move |(mut file, remaining)| async move {
-        const CHUNK: usize = 64 * 1024;
-        if remaining == 0 {
-            return None;
-        }
-        let to_read = remaining.min(CHUNK as u64) as usize;
-        let mut buf = vec![0u8; to_read];
-        match file.read_exact(&mut buf).await {
-            Ok(_) => {
-                if let Some(bps) = bandwidth {
-                    if bps > 0 {
-                        let secs = to_read as f64 / bps as f64;
-                        tokio::time::sleep(Duration::from_secs_f64(secs)).await;
-                    }
-                }
-                let frame = Ok(Frame::data(Bytes::from(buf)));
-                Some((frame, (file, remaining - to_read as u64)))
+    let stream =
+        futures_util::stream::unfold((file, len), move |(mut file, remaining)| async move {
+            const CHUNK: usize = 64 * 1024;
+            if remaining == 0 {
+                return None;
             }
-            Err(e) => Some((Err(e), (file, 0))),
-        }
-    });
+            let to_read = remaining.min(CHUNK as u64) as usize;
+            let mut buf = vec![0u8; to_read];
+            match file.read_exact(&mut buf).await {
+                Ok(_) => {
+                    if let Some(bps) = bandwidth {
+                        if bps > 0 {
+                            let secs = to_read as f64 / bps as f64;
+                            tokio::time::sleep(Duration::from_secs_f64(secs)).await;
+                        }
+                    }
+                    let frame = Ok(Frame::data(Bytes::from(buf)));
+                    Some((frame, (file, remaining - to_read as u64)))
+                }
+                Err(e) => Some((Err(e), (file, 0))),
+            }
+        });
     let body = StreamBody::new(stream).boxed();
 
     let mut builder = Response::builder()

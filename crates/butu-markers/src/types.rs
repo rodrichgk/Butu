@@ -70,14 +70,43 @@ pub struct EpisodeResult {
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ProgressEvent {
-    Started { total_shows: usize, total_episodes: usize },
-    Show { index: usize, title: String, season_count: usize },
-    Season { show_title: String, season_number: i32, episode_count: usize },
-    Episode { show_title: String, season_number: i32, episode_number: i32, stage: EpisodeStage },
-    EpisodeMarkers { show_title: String, season_number: i32, episode_number: i32, intro_ms: Option<(u64, u64)>, credits_ms: Option<(u64, u64)> },
-    ShowFinished { title: String, episode_results: usize },
-    Finished { total_episodes_marked: usize },
-    Failed { message: String },
+    Started {
+        total_shows: usize,
+        total_episodes: usize,
+    },
+    Show {
+        index: usize,
+        title: String,
+        season_count: usize,
+    },
+    Season {
+        show_title: String,
+        season_number: i32,
+        episode_count: usize,
+    },
+    Episode {
+        show_title: String,
+        season_number: i32,
+        episode_number: i32,
+        stage: EpisodeStage,
+    },
+    EpisodeMarkers {
+        show_title: String,
+        season_number: i32,
+        episode_number: i32,
+        intro_ms: Option<(u64, u64)>,
+        credits_ms: Option<(u64, u64)>,
+    },
+    ShowFinished {
+        title: String,
+        episode_results: usize,
+    },
+    Finished {
+        total_episodes_marked: usize,
+    },
+    Failed {
+        message: String,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Serialize)]

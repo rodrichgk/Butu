@@ -33,6 +33,11 @@
 //! let results = analyze_fast(runner, sink, shows, cancel, DEFAULT_CONCURRENCY).await?;
 //! # Ok(()) }
 //! ```
+// Numbered / bulleted lists in the module docs read fine as-is.
+#![allow(clippy::doc_lazy_continuation)]
+// The alignment + luma-scan loops index by position intentionally (a[i] vs
+// b[i-shift]; windowed luma means); the iterator rewrites read worse.
+#![allow(clippy::needless_range_loop)]
 
 pub mod audio;
 pub mod detect;

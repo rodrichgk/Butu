@@ -25,8 +25,8 @@
 //! rather than assumed, so timestamps aren't scaled wrong. Returned start/end are
 //! ms offsets into the *window* that was decoded.
 
-use std::collections::{HashMap, HashSet};
 use crate::fingerprint::Fingerprint;
+use std::collections::{HashMap, HashSet};
 
 /// Per-hash Hamming distance for *measuring* a run. Transcoded audio puts the
 /// same music ~10-11 bits apart, so 12 recovers the full match while staying
@@ -125,7 +125,9 @@ pub fn detect_markers(
         let median_start = median_usize_mut(&mut start_v);
         let (start_hash, length_hash) = matches[i]
             .iter()
-            .filter(|&&(s, _)| (s as i64 - median_start as i64).abs() as usize <= START_CLUSTER_TOLERANCE)
+            .filter(|&&(s, _)| {
+                (s as i64 - median_start as i64).unsigned_abs() as usize <= START_CLUSTER_TOLERANCE
+            })
             .max_by_key(|&&(_, l)| l)
             .copied()
             .unwrap_or((median_start, 0));
@@ -155,7 +157,9 @@ struct Match {
 /// Silence usually produces repeating streams of the identical integer.
 fn has_sufficient_entropy(slice: &[u32]) -> bool {
     let len = slice.len();
-    if len == 0 { return false; }
+    if len == 0 {
+        return false;
+    }
 
     // Count unique hashes
     let mut unique = HashSet::new();
@@ -213,8 +217,12 @@ fn vote_shift_candidates(a: &[u32], b: &[u32]) -> Vec<i64> {
         }
     }
     let mut scored: Vec<(u32, i64)> = votes.into_iter().map(|(s, v)| (v, s)).collect();
-    scored.sort_unstable_by(|x, y| y.0.cmp(&x.0));
-    scored.into_iter().take(SHIFT_CANDIDATES).map(|(_, s)| s).collect()
+    scored.sort_unstable_by_key(|&(votes, _)| std::cmp::Reverse(votes));
+    scored
+        .into_iter()
+        .take(SHIFT_CANDIDATES)
+        .map(|(_, s)| s)
+        .collect()
 }
 
 /// Verify a neighbourhood around each candidate shift; return the longest run.
@@ -300,4 +308,111 @@ fn median_usize_mut(v: &mut [usize]) -> usize {
     }
     v.sort_unstable();
     v[v.len() / 2]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::fingerprint::Fingerprint;
+
+    /// A well-mixed hash of (seed, i) — so different seeds give INDEPENDENT
+    /// sequences (unlike an LCG, whose seeds are just offsets into one cycle).
+    /// Stands in for the high-entropy fingerprint of unique content.
+    fn mix(seed: u32, i: u32) -> u32 {
+        let mut z = seed.wrapping_mul(0x9E37_79B1) ^ i.wrapping_mul(0x85EB_CA77);
+        z ^= z >> 16;
+        z = z.wrapping_mul(0x7FEB_352D);
+        z ^= z >> 15;
+        z = z.wrapping_mul(0x846C_A68B);
+        z ^= z >> 16;
+        z
+    }
+
+    fn noise(seed: u32, n: usize) -> Vec<u32> {
+        (0..n as u32).map(|i| mix(seed, i)).collect()
+    }
+
+    /// Fingerprint whose ms_per_hash is exactly 124 ms (duration = n * 0.124 s).
+    fn fp(hashes: Vec<u32>) -> Fingerprint {
+        let secs = hashes.len() as f64 * 0.124;
+        Fingerprint {
+            hashes,
+            duration_secs: secs,
+        }
+    }
+
+    #[test]
+    fn entropy_rejects_silence_accepts_content() {
+        assert!(!has_sufficient_entropy(&vec![7u32; 200])); // one repeated value = silence
+        assert!(has_sufficient_entropy(&noise(3, 200)));
+    }
+
+    #[test]
+    fn run_at_shift_locates_shared_segment() {
+        let shared = noise(42, 120);
+        // a: 30 filler + shared + 30 filler ; b: 10 filler + shared + 40 filler
+        let mut a = noise(1, 30);
+        a.extend_from_slice(&shared);
+        a.extend(noise(2, 30));
+        let mut b = noise(3, 10);
+        b.extend_from_slice(&shared);
+        b.extend(noise(4, 40));
+        // shared at 30 in a, 10 in b → shift = 30 - 10 = 20
+        let m = run_at_shift(&a, &b, 20).expect("shared run found");
+        assert_eq!(m.start_a, 30);
+        assert_eq!(m.start_b, 10);
+        assert!(m.length >= 118, "length {} too short", m.length);
+    }
+
+    #[test]
+    fn run_at_shift_rejects_unrelated() {
+        let a = noise(1, 300);
+        let b = noise(999, 300);
+        assert!(run_at_shift(&a, &b, 0).is_none());
+    }
+
+    #[test]
+    fn detect_markers_aligns_shared_intro_across_episodes() {
+        let shared = noise(77, 120); // ~15 s recurring "intro"
+        let mk = |seed: u32, pos: usize| {
+            let mut v = noise(seed, pos);
+            v.extend_from_slice(&shared);
+            v.extend(noise(seed.wrapping_add(500), 60));
+            fp(v)
+        };
+        // Same recurring segment at DIFFERENT positions (varying cold-open length).
+        let cases = [(11u32, 30usize), (22, 70), (33, 15)];
+        let fps: Vec<Option<Fingerprint>> = cases.iter().map(|&(s, p)| Some(mk(s, p))).collect();
+
+        let det = detect_markers(&fps, 300);
+        for (i, &(_, pos)) in cases.iter().enumerate() {
+            let d = det[i]
+                .as_ref()
+                .unwrap_or_else(|| panic!("no detection for ep {i}"));
+            let start_hash = (d.start_ms as f64 / 124.0).round() as i64;
+            // Gap-tolerant matching can absorb a few adjacent chance-matched filler
+            // hashes, so the boundary drifts ~1 s — as seen on real audio.
+            assert!(
+                (start_hash - pos as i64).abs() <= 10,
+                "ep{i} start {start_hash} vs {pos}"
+            );
+            let len_hash = (d.end_ms - d.start_ms) as f64 / 124.0;
+            assert!(
+                (110.0..=140.0).contains(&len_hash),
+                "ep{i} length {len_hash}"
+            );
+            assert!(d.agreement > 0.5, "ep{i} agreement {}", d.agreement);
+        }
+    }
+
+    #[test]
+    fn detect_markers_finds_nothing_in_unrelated_episodes() {
+        let fps: Vec<Option<Fingerprint>> =
+            (0..4).map(|i| Some(fp(noise(1000 + i, 300)))).collect();
+        let det = detect_markers(&fps, 300);
+        assert!(
+            det.iter().all(|d| d.is_none()),
+            "spurious detection on unrelated audio"
+        );
+    }
 }

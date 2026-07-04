@@ -145,7 +145,10 @@ async fn main() -> anyhow::Result<()> {
             Some(
                 netsim::spawn(
                     args.root.clone(),
-                    Throttle { latency: Duration::from_millis(lat), bandwidth_bps },
+                    Throttle {
+                        latency: Duration::from_millis(lat),
+                        bandwidth_bps,
+                    },
                 )
                 .await?,
             )
@@ -157,8 +160,7 @@ async fn main() -> anyhow::Result<()> {
 
         for algo in &args.algos {
             println!("running {algo} @ {lat}ms latency …");
-            let (elapsed, results) =
-                run_once(algo, &runner, &show_inputs, concurrency).await;
+            let (elapsed, results) = run_once(algo, &runner, &show_inputs, concurrency).await;
             let marked = results.len();
             println!("  {algo} @ {lat}ms: {elapsed:.1}s, {marked} episodes marked");
             runs.push(Run {
@@ -211,7 +213,13 @@ async fn main() -> anyhow::Result<()> {
         rows
     };
 
-    let json = report::to_json(&runs, parity.as_deref().unwrap_or(&[]), &label_rows, &labels, &runs);
+    let json = report::to_json(
+        &runs,
+        parity.as_deref().unwrap_or(&[]),
+        &label_rows,
+        &labels,
+        &runs,
+    );
     std::fs::write(&args.out, serde_json::to_string_pretty(&json)?)?;
     println!("\nwrote {}", args.out.display());
 
@@ -256,8 +264,12 @@ fn compute_parity(
     lats.sort_unstable();
     lats.dedup();
     for lat in lats {
-        let legacy = runs.iter().find(|r| r.latency_ms == lat && r.algo == "legacy");
-        let fast = runs.iter().find(|r| r.latency_ms == lat && r.algo == "fast");
+        let legacy = runs
+            .iter()
+            .find(|r| r.latency_ms == lat && r.algo == "legacy");
+        let fast = runs
+            .iter()
+            .find(|r| r.latency_ms == lat && r.algo == "fast");
         if let (Some(l), Some(f)) = (legacy, fast) {
             return Some(report::parity(all_ids, &l.results, &f.results, tol_ms));
         }
@@ -271,11 +283,18 @@ fn resolve_bin(flag: Option<PathBuf>, name: &str) -> PathBuf {
     if let Some(p) = flag {
         return p;
     }
-    if let Some(ws) = Path::new(env!("CARGO_MANIFEST_DIR")).parent().and_then(|p| p.parent()) {
+    if let Some(ws) = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+    {
         let bindir = ws.join("src-tauri").join("binaries");
         if let Ok(rd) = std::fs::read_dir(&bindir) {
             for e in rd.flatten() {
-                if e.file_name().to_string_lossy().to_ascii_lowercase().starts_with(name) {
+                if e.file_name()
+                    .to_string_lossy()
+                    .to_ascii_lowercase()
+                    .starts_with(name)
+                {
                     return e.path();
                 }
             }

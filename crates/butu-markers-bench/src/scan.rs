@@ -51,7 +51,10 @@ pub fn scan(root: &Path, filter: Option<&[String]>) -> anyhow::Result<Vec<Scanne
         }
         if let Some(f) = filter {
             let lower = dir_name.to_ascii_lowercase();
-            if !f.iter().any(|want| lower.contains(&want.to_ascii_lowercase())) {
+            if !f
+                .iter()
+                .any(|want| lower.contains(&want.to_ascii_lowercase()))
+            {
                 continue;
             }
         }
@@ -76,7 +79,9 @@ fn collect_episodes(root: &Path, show_dir: &Path) -> Vec<ScannedEpisode> {
     // Recurse one level into Season folders (and also accept files directly).
     let mut stack = vec![show_dir.to_path_buf()];
     while let Some(dir) = stack.pop() {
-        let Ok(rd) = std::fs::read_dir(&dir) else { continue };
+        let Ok(rd) = std::fs::read_dir(&dir) else {
+            continue;
+        };
         for e in rd.filter_map(|e| e.ok()) {
             let p = e.path();
             if p.is_dir() {
@@ -91,8 +96,14 @@ fn collect_episodes(root: &Path, show_dir: &Path) -> Vec<ScannedEpisode> {
             if !VIDEO_EXTS.contains(&ext.as_str()) {
                 continue;
             }
-            let name = p.file_name().unwrap_or_default().to_string_lossy().into_owned();
-            let Some((season, episode)) = parse_se(&name) else { continue };
+            let name = p
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned();
+            let Some((season, episode)) = parse_se(&name) else {
+                continue;
+            };
             let rel = p
                 .strip_prefix(root)
                 .unwrap_or(&p)
@@ -181,7 +192,10 @@ pub fn to_show_inputs(shows: &[ScannedShow], server: Option<&NetSim>) -> Vec<Sho
             }
             let seasons = by_season
                 .into_iter()
-                .map(|(season_number, episodes)| SeasonInput { season_number, episodes })
+                .map(|(season_number, episodes)| SeasonInput {
+                    season_number,
+                    episodes,
+                })
                 .collect();
             ShowInput {
                 title: s.title.clone(),

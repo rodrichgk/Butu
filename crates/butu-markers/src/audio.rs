@@ -44,7 +44,11 @@ async fn run_extract(
     let out = runner.ffmpeg(&args).await?;
     if out.code != 0 {
         let _ = std::fs::remove_file(&out_path);
-        return Err(format!("ffmpeg exited with code {}: {}", out.code, out.stderr.trim()));
+        return Err(format!(
+            "ffmpeg exited with code {}: {}",
+            out.code,
+            out.stderr.trim()
+        ));
     }
     Ok(out_path)
 }

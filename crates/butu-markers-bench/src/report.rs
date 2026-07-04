@@ -31,9 +31,15 @@ fn marker_of(er: &EpisodeResult, mt: MarkerType) -> Option<(u64, u64)> {
 
 pub fn print_speed(runs: &[Run]) {
     println!("\n=== SPEED (wall-clock) ===");
-    println!("{:>9}  {:>10}  {:>9}  {:>9}  {:>8}", "latency", "bandwidth", "algo", "elapsed", "marked");
+    println!(
+        "{:>9}  {:>10}  {:>9}  {:>9}  {:>8}",
+        "latency", "bandwidth", "algo", "elapsed", "marked"
+    );
     for r in runs {
-        let bw = r.bandwidth_mbps.map(|b| format!("{b:.0} MB/s")).unwrap_or_else(|| "∞".into());
+        let bw = r
+            .bandwidth_mbps
+            .map(|b| format!("{b:.0} MB/s"))
+            .unwrap_or_else(|| "∞".into());
         println!(
             "{:>7}ms  {:>10}  {:>9}  {:>8.1}s  {:>8}",
             r.latency_ms, bw, r.algo, r.elapsed_s, r.episodes_marked
@@ -43,7 +49,10 @@ pub fn print_speed(runs: &[Run]) {
     // Per-latency legacy/fast speedup, when both present.
     let mut by_lat: BTreeMap<u64, HashMap<String, f64>> = BTreeMap::new();
     for r in runs {
-        by_lat.entry(r.latency_ms).or_default().insert(r.algo.clone(), r.elapsed_s);
+        by_lat
+            .entry(r.latency_ms)
+            .or_default()
+            .insert(r.algo.clone(), r.elapsed_s);
     }
     println!("\n--- speedup (legacy ÷ fast) ---");
     for (lat, m) in &by_lat {
@@ -85,7 +94,8 @@ fn parity_for(
     fast: &HashMap<String, &EpisodeResult>,
     tol_ms: u64,
 ) -> ParityStat {
-    let (mut both_agree, mut both_disagree, mut only_legacy, mut only_fast, mut neither) = (0, 0, 0, 0, 0);
+    let (mut both_agree, mut both_disagree, mut only_legacy, mut only_fast, mut neither) =
+        (0, 0, 0, 0, 0);
     let mut dstarts = Vec::new();
     let mut dends = Vec::new();
 
@@ -110,7 +120,13 @@ fn parity_for(
         }
     }
 
-    let mean = |v: &[u64]| if v.is_empty() { 0.0 } else { v.iter().sum::<u64>() as f64 / v.len() as f64 };
+    let mean = |v: &[u64]| {
+        if v.is_empty() {
+            0.0
+        } else {
+            v.iter().sum::<u64>() as f64 / v.len() as f64
+        }
+    };
     ParityStat {
         marker,
         both_agree,
@@ -133,11 +149,20 @@ pub fn parity(
     fast: &[EpisodeResult],
     tol_ms: u64,
 ) -> Vec<ParityStat> {
-    let lmap: HashMap<String, &EpisodeResult> = legacy.iter().map(|e| (e.episode_id.clone(), e)).collect();
-    let fmap: HashMap<String, &EpisodeResult> = fast.iter().map(|e| (e.episode_id.clone(), e)).collect();
+    let lmap: HashMap<String, &EpisodeResult> =
+        legacy.iter().map(|e| (e.episode_id.clone(), e)).collect();
+    let fmap: HashMap<String, &EpisodeResult> =
+        fast.iter().map(|e| (e.episode_id.clone(), e)).collect();
     vec![
         parity_for("intro", MarkerType::Intro, all_ids, &lmap, &fmap, tol_ms),
-        parity_for("credits", MarkerType::Credits, all_ids, &lmap, &fmap, tol_ms),
+        parity_for(
+            "credits",
+            MarkerType::Credits,
+            all_ids,
+            &lmap,
+            &fmap,
+            tol_ms,
+        ),
     ]
 }
 
@@ -202,7 +227,12 @@ pub fn label_accuracy(
     let title_by_id: HashMap<String, String> = shows
         .iter()
         .map(|s| {
-            let id = s.external_id.rsplit("://").next().unwrap_or(&s.external_id).to_string();
+            let id = s
+                .external_id
+                .rsplit("://")
+                .next()
+                .unwrap_or(&s.external_id)
+                .to_string();
             (id, s.title.to_ascii_lowercase())
         })
         .collect();
@@ -220,18 +250,29 @@ pub fn label_accuracy(
         if !seen_algo.insert(r.algo.clone()) {
             continue;
         }
-        for (marker, mt) in [("intro", MarkerType::Intro), ("credits", MarkerType::Credits)] {
+        for (marker, mt) in [
+            ("intro", MarkerType::Intro),
+            ("credits", MarkerType::Credits),
+        ] {
             let (mut matched, mut within, mut sum_err) = (0usize, 0usize, 0f64);
             for er in &r.results {
-                let (Some(season), Some(episode)) = (er.season, er.episode) else { continue };
-                let Some(title) = title_by_id.get(&er.provider_id) else { continue };
-                let Some(label) = label_map.get(&(title.clone(), season, episode)) else { continue };
+                let (Some(season), Some(episode)) = (er.season, er.episode) else {
+                    continue;
+                };
+                let Some(title) = title_by_id.get(&er.provider_id) else {
+                    continue;
+                };
+                let Some(label) = label_map.get(&(title.clone(), season, episode)) else {
+                    continue;
+                };
                 let want = match mt {
                     MarkerType::Intro => label.intro,
                     MarkerType::Credits => label.credits,
                 };
                 let Some(want) = want else { continue };
-                let Some((got_start, _)) = marker_of(er, mt) else { continue };
+                let Some((got_start, _)) = marker_of(er, mt) else {
+                    continue;
+                };
                 let err = got_start.abs_diff(want[0]);
                 matched += 1;
                 sum_err += err as f64;
@@ -244,7 +285,11 @@ pub fn label_accuracy(
                 marker,
                 matched,
                 within_tol: within,
-                mean_abs_start_err: if matched > 0 { sum_err / matched as f64 } else { 0.0 },
+                mean_abs_start_err: if matched > 0 {
+                    sum_err / matched as f64
+                } else {
+                    0.0
+                },
             });
         }
     }
@@ -256,7 +301,10 @@ pub fn print_label_accuracy(rows: &[LabelAccuracy], tol_ms: u64) {
         return;
     }
     println!("\n=== ABSOLUTE ACCURACY vs labels (start error, tolerance ±{tol_ms}ms) ===");
-    println!("{:>8}  {:>8}  {:>8}  {:>10}  {:>16}", "algo", "marker", "matched", "within", "mean|Δstart|");
+    println!(
+        "{:>8}  {:>8}  {:>8}  {:>10}  {:>16}",
+        "algo", "marker", "matched", "within", "mean|Δstart|"
+    );
     for r in rows {
         println!(
             "{:>8}  {:>8}  {:>8}  {:>8}/{:<1}  {:>14.0}ms",

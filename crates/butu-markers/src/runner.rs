@@ -47,7 +47,10 @@ impl ProcessRunner {
         ffmpeg: impl Into<std::path::PathBuf>,
         fpcalc: impl Into<std::path::PathBuf>,
     ) -> Self {
-        Self { ffmpeg: ffmpeg.into(), fpcalc: fpcalc.into() }
+        Self {
+            ffmpeg: ffmpeg.into(),
+            fpcalc: fpcalc.into(),
+        }
     }
 }
 

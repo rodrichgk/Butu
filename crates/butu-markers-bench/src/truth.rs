@@ -57,7 +57,10 @@ pub async fn fetch_labels(shows: &[ScannedShow]) -> anyhow::Result<Vec<Label>> {
                 });
             }
         }
-        eprintln!("  truth: {} ({imdb}) — {found} episodes with markers", show.title);
+        eprintln!(
+            "  truth: {} ({imdb}) — {found} episodes with markers",
+            show.title
+        );
     }
     Ok(labels)
 }

@@ -50,7 +50,11 @@ fn ffmpeg_key(args: &[String]) -> (String, Option<PathBuf>) {
         .last()
         .filter(|a| a.ends_with(".pcm"))
         .map(PathBuf::from);
-    let key_slice = if out.is_some() { &args[..args.len() - 1] } else { args };
+    let key_slice = if out.is_some() {
+        &args[..args.len() - 1]
+    } else {
+        args
+    };
     (hash_key(key_slice), out)
 }
 
@@ -70,7 +74,11 @@ impl MediaRunner for CachingRunner {
                         std::fs::copy(&pcm_p, op).map_err(|e| format!("cache restore pcm: {e}"))?;
                     }
                 }
-                return Ok(CmdOutput { code: meta.code, stdout, stderr: meta.stderr });
+                return Ok(CmdOutput {
+                    code: meta.code,
+                    stdout,
+                    stderr: meta.stderr,
+                });
             }
         }
 
@@ -82,7 +90,10 @@ impl MediaRunner for CachingRunner {
                 let _ = std::fs::copy(op, &pcm_p);
             }
         }
-        if let Ok(bytes) = serde_json::to_vec(&Meta { code: res.code, stderr: res.stderr.clone() }) {
+        if let Ok(bytes) = serde_json::to_vec(&Meta {
+            code: res.code,
+            stderr: res.stderr.clone(),
+        }) {
             let _ = std::fs::write(&meta_p, bytes);
         }
         Ok(res)

@@ -80,8 +80,18 @@ pub async fn analyze(
     shows: Vec<ShowInput>,
     cancel: Arc<AtomicBool>,
 ) -> Result<Vec<EpisodeResult>, String> {
-    let total_episodes: usize = shows.iter().flat_map(|s| s.seasons.iter()).flat_map(|s| &s.episodes).count();
-    emit(sink.as_ref(), &ProgressEvent::Started { total_shows: shows.len(), total_episodes });
+    let total_episodes: usize = shows
+        .iter()
+        .flat_map(|s| s.seasons.iter())
+        .flat_map(|s| &s.episodes)
+        .count();
+    emit(
+        sink.as_ref(),
+        &ProgressEvent::Started {
+            total_shows: shows.len(),
+            total_episodes,
+        },
+    );
 
     let mut results: Vec<EpisodeResult> = Vec::new();
 
@@ -97,11 +107,14 @@ pub async fn analyze(
             }
         };
 
-        emit(sink.as_ref(), &ProgressEvent::Show {
-            index: show_idx,
-            title: show.title.clone(),
-            season_count: show.seasons.len(),
-        });
+        emit(
+            sink.as_ref(),
+            &ProgressEvent::Show {
+                index: show_idx,
+                title: show.title.clone(),
+                season_count: show.seasons.len(),
+            },
+        );
 
         let mut show_results = 0usize;
 
@@ -112,10 +125,13 @@ pub async fn analyze(
                 show_results += 1;
                 results.push(er);
             }
-            emit(sink.as_ref(), &ProgressEvent::ShowFinished {
-                title: show.title.clone(),
-                episode_results: show_results,
-            });
+            emit(
+                sink.as_ref(),
+                &ProgressEvent::ShowFinished {
+                    title: show.title.clone(),
+                    episode_results: show_results,
+                },
+            );
             continue;
         }
 
@@ -135,7 +151,8 @@ pub async fn analyze(
 
                 if let Some(d) = &intro_detections[ep_idx] {
                     let span = d.end_ms.saturating_sub(d.start_ms);
-                    if d.agreement >= MIN_AGREEMENT && (INTRO_MIN_MS..=INTRO_MAX_MS).contains(&span) {
+                    if d.agreement >= MIN_AGREEMENT && (INTRO_MIN_MS..=INTRO_MAX_MS).contains(&span)
+                    {
                         markers.push(DetectedMarker {
                             marker_type: MarkerType::Intro,
                             start_ms: d.start_ms,
@@ -148,7 +165,9 @@ pub async fn analyze(
                 let mut credits: Option<(u64, u64)> = None;
                 if let Some(d) = &credits_detections[ep_idx] {
                     let span = d.end_ms.saturating_sub(d.start_ms);
-                    if d.agreement >= MIN_AGREEMENT && (CREDITS_MIN_MS..=CREDITS_MAX_MS).contains(&span) {
+                    if d.agreement >= MIN_AGREEMENT
+                        && (CREDITS_MIN_MS..=CREDITS_MAX_MS).contains(&span)
+                    {
                         let off = ep.duration_ms.saturating_sub(CREDITS_WINDOW_LEN_S * 1000);
                         let fp_start = off + d.start_ms;
                         let fp_end = off + d.end_ms;
@@ -157,8 +176,14 @@ pub async fn analyze(
                         // fade-to-black that cuts into the credit roll, when one sits close.
                         let search_start = fp_start.saturating_sub(CREDITS_REFINE_LOOKBACK_MS);
                         let start = match find_credits_fade_in_range(
-                            runner.as_ref(), &ep.stream_url, ep.headers.as_ref(), search_start, fp_start,
-                        ).await {
+                            runner.as_ref(),
+                            &ep.stream_url,
+                            ep.headers.as_ref(),
+                            search_start,
+                            fp_start,
+                        )
+                        .await
+                        {
                             Some(fade) if fade < fp_start => fade,
                             _ => fp_start,
                         };
@@ -169,8 +194,13 @@ pub async fn analyze(
                 // so fingerprinting finds nothing — detect the fade-to-black instead.
                 if credits.is_none() {
                     if let Some(span) = detect_credits_blackframe(
-                        runner.as_ref(), &ep.stream_url, ep.headers.as_ref(), ep.duration_ms,
-                    ).await {
+                        runner.as_ref(),
+                        &ep.stream_url,
+                        ep.headers.as_ref(),
+                        ep.duration_ms,
+                    )
+                    .await
+                    {
                         let len = span.end_ms.saturating_sub(span.start_ms);
                         if (CREDITS_MIN_MS..=CREDITS_MAX_MOVIE_MS).contains(&len) {
                             credits = Some((span.start_ms, span.end_ms));
@@ -178,22 +208,31 @@ pub async fn analyze(
                     }
                 }
                 if let Some((s, e)) = credits {
-                    markers.push(DetectedMarker { marker_type: MarkerType::Credits, start_ms: s, end_ms: e });
+                    markers.push(DetectedMarker {
+                        marker_type: MarkerType::Credits,
+                        start_ms: s,
+                        end_ms: e,
+                    });
                 }
 
-                let intro_ms = markers.iter()
+                let intro_ms = markers
+                    .iter()
                     .find(|m| matches!(m.marker_type, MarkerType::Intro))
                     .map(|m| (m.start_ms, m.end_ms));
-                let credits_ms = markers.iter()
+                let credits_ms = markers
+                    .iter()
                     .find(|m| matches!(m.marker_type, MarkerType::Credits))
                     .map(|m| (m.start_ms, m.end_ms));
-                emit(sink.as_ref(), &ProgressEvent::EpisodeMarkers {
-                    show_title: show.title.clone(),
-                    season_number: ep.season,
-                    episode_number: ep.episode,
-                    intro_ms,
-                    credits_ms,
-                });
+                emit(
+                    sink.as_ref(),
+                    &ProgressEvent::EpisodeMarkers {
+                        show_title: show.title.clone(),
+                        season_number: ep.season,
+                        episode_number: ep.episode,
+                        intro_ms,
+                        credits_ms,
+                    },
+                );
 
                 if !markers.is_empty() {
                     show_results += 1;
@@ -210,15 +249,21 @@ pub async fn analyze(
             }
         }
 
-        emit(sink.as_ref(), &ProgressEvent::ShowFinished {
-            title: show.title.clone(),
-            episode_results: show_results,
-        });
+        emit(
+            sink.as_ref(),
+            &ProgressEvent::ShowFinished {
+                title: show.title.clone(),
+                episode_results: show_results,
+            },
+        );
     }
 
-    emit(sink.as_ref(), &ProgressEvent::Finished {
-        total_episodes_marked: results.len(),
-    });
+    emit(
+        sink.as_ref(),
+        &ProgressEvent::Finished {
+            total_episodes_marked: results.len(),
+        },
+    );
     Ok(results)
 }
 
@@ -229,15 +274,21 @@ async fn process_season(
     season: &SeasonInput,
     cancel: Arc<AtomicBool>,
 ) -> (Vec<Option<Detection>>, Vec<Option<Detection>>) {
-    emit(sink.as_ref(), &ProgressEvent::Season {
-        show_title: show_title.into(),
-        season_number: season.season_number,
-        episode_count: season.episodes.len(),
-    });
+    emit(
+        sink.as_ref(),
+        &ProgressEvent::Season {
+            show_title: show_title.into(),
+            season_number: season.season_number,
+            episode_count: season.episodes.len(),
+        },
+    );
 
     if season.episodes.len() < 2 {
         // Need >= 2 episodes for fingerprint alignment to mean anything.
-        return (vec![None; season.episodes.len()], vec![None; season.episodes.len()]);
+        return (
+            vec![None; season.episodes.len()],
+            vec![None; season.episodes.len()],
+        );
     }
 
     let concurrency = 2; // Process up to 2 episodes concurrently
@@ -259,18 +310,27 @@ async fn process_season(
                 let has_credits = duration_s > credits_len_s + 10;
                 let tail_start_s = duration_s.saturating_sub(credits_len_s);
 
-                emit(sink.as_ref(), &ProgressEvent::Episode {
-                    show_title: title.clone(),
-                    season_number: ep.season,
-                    episode_number: ep.episode,
-                    stage: EpisodeStage::Decoding,
-                });
+                emit(
+                    sink.as_ref(),
+                    &ProgressEvent::Episode {
+                        show_title: title.clone(),
+                        season_number: ep.season,
+                        episode_number: ep.episode,
+                        stage: EpisodeStage::Decoding,
+                    },
+                );
 
                 // Run intro and credits extraction in parallel for the same episode
-                let intro_fut = fingerprint_one(runner.as_ref(), &ep, INTRO_WINDOW_START_S, INTRO_WINDOW_LEN_S);
+                let intro_fut = fingerprint_one(
+                    runner.as_ref(),
+                    &ep,
+                    INTRO_WINDOW_START_S,
+                    INTRO_WINDOW_LEN_S,
+                );
 
                 let (intro_res, credits_res_opt) = if has_credits {
-                    let credits_fut = fingerprint_one(runner.as_ref(), &ep, tail_start_s, credits_len_s);
+                    let credits_fut =
+                        fingerprint_one(runner.as_ref(), &ep, tail_start_s, credits_len_s);
                     let (intro_res, credits_res) = tokio::join!(intro_fut, credits_fut);
                     (intro_res, Some(credits_res))
                 } else {
@@ -278,12 +338,15 @@ async fn process_season(
                     (intro_res, None)
                 };
 
-                emit(sink.as_ref(), &ProgressEvent::Episode {
-                    show_title: title.clone(),
-                    season_number: ep.season,
-                    episode_number: ep.episode,
-                    stage: EpisodeStage::Done,
-                });
+                emit(
+                    sink.as_ref(),
+                    &ProgressEvent::Episode {
+                        show_title: title.clone(),
+                        season_number: ep.season,
+                        episode_number: ep.episode,
+                        stage: EpisodeStage::Done,
+                    },
+                );
 
                 Some((ep.id.clone(), intro_res, credits_res_opt))
             }
@@ -346,12 +409,15 @@ pub(crate) async fn process_movie(
     let ep = show.seasons.first()?.episodes.first()?;
     let headers = ep.headers.as_ref();
 
-    emit(sink.as_ref(), &ProgressEvent::Episode {
-        show_title: show.title.clone(),
-        season_number: 0,
-        episode_number: 0,
-        stage: EpisodeStage::Decoding,
-    });
+    emit(
+        sink.as_ref(),
+        &ProgressEvent::Episode {
+            show_title: show.title.clone(),
+            season_number: 0,
+            episode_number: 0,
+            stage: EpisodeStage::Decoding,
+        },
+    );
 
     // 1. Authored chapters beat anything we can guess.
     let chapters = read_chapters(runner.as_ref(), &ep.stream_url, headers).await;
@@ -368,7 +434,10 @@ pub(crate) async fn process_movie(
     // 2. Credits: chapter if present, else fade-to-black detection.
     let credits = match chapters.credits {
         Some(c) => Some(c),
-        None => detect_credits_blackframe(runner.as_ref(), &ep.stream_url, headers, ep.duration_ms).await,
+        None => {
+            detect_credits_blackframe(runner.as_ref(), &ep.stream_url, headers, ep.duration_ms)
+                .await
+        }
     };
     if let Some(c) = credits {
         let span = c.end_ms.saturating_sub(c.start_ms);
@@ -381,23 +450,31 @@ pub(crate) async fn process_movie(
         }
     }
 
-    emit(sink.as_ref(), &ProgressEvent::Episode {
-        show_title: show.title.clone(),
-        season_number: 0,
-        episode_number: 0,
-        stage: EpisodeStage::Done,
-    });
-    emit(sink.as_ref(), &ProgressEvent::EpisodeMarkers {
-        show_title: show.title.clone(),
-        season_number: 0,
-        episode_number: 0,
-        intro_ms: markers.iter()
-            .find(|m| matches!(m.marker_type, MarkerType::Intro))
-            .map(|m| (m.start_ms, m.end_ms)),
-        credits_ms: markers.iter()
-            .find(|m| matches!(m.marker_type, MarkerType::Credits))
-            .map(|m| (m.start_ms, m.end_ms)),
-    });
+    emit(
+        sink.as_ref(),
+        &ProgressEvent::Episode {
+            show_title: show.title.clone(),
+            season_number: 0,
+            episode_number: 0,
+            stage: EpisodeStage::Done,
+        },
+    );
+    emit(
+        sink.as_ref(),
+        &ProgressEvent::EpisodeMarkers {
+            show_title: show.title.clone(),
+            season_number: 0,
+            episode_number: 0,
+            intro_ms: markers
+                .iter()
+                .find(|m| matches!(m.marker_type, MarkerType::Intro))
+                .map(|m| (m.start_ms, m.end_ms)),
+            credits_ms: markers
+                .iter()
+                .find(|m| matches!(m.marker_type, MarkerType::Credits))
+                .map(|m| (m.start_ms, m.end_ms)),
+        },
+    );
 
     if markers.is_empty() {
         return None;
@@ -419,7 +496,8 @@ async fn fingerprint_one(
     start_s: u64,
     len_s: u64,
 ) -> Result<Fingerprint, String> {
-    let pcm = extract_pcm_window(runner, &ep.stream_url, ep.headers.as_ref(), start_s, len_s).await?;
+    let pcm =
+        extract_pcm_window(runner, &ep.stream_url, ep.headers.as_ref(), start_s, len_s).await?;
     let result = fingerprint_pcm(runner, &pcm, len_s as u32).await;
     cleanup_pcm(&pcm);
 
@@ -443,7 +521,42 @@ pub(crate) fn pick_external_id(ids: &[String]) -> Option<(String, String)> {
         }
     }
     let parsed: Vec<(String, String)> = ids.iter().filter_map(|s| parse(s)).collect();
-    parsed.iter().find(|(p, _)| p == "tmdb").cloned()
+    parsed
+        .iter()
+        .find(|(p, _)| p == "tmdb")
+        .cloned()
         .or_else(|| parsed.iter().find(|(p, _)| p == "tvdb").cloned())
         .or_else(|| parsed.iter().find(|(p, _)| p == "imdb").cloned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::pick_external_id;
+
+    fn ids(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn prefers_tmdb_then_tvdb_then_imdb() {
+        assert_eq!(
+            pick_external_id(&ids(&["imdb://tt1", "tvdb://5", "tmdb://9"])),
+            Some(("tmdb".into(), "9".into()))
+        );
+        assert_eq!(
+            pick_external_id(&ids(&["imdb://tt1", "tvdb://5"])),
+            Some(("tvdb".into(), "5".into()))
+        );
+        assert_eq!(
+            pick_external_id(&ids(&["imdb://tt1"])),
+            Some(("imdb".into(), "tt1".into()))
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_provider_and_empty_id() {
+        assert_eq!(pick_external_id(&ids(&["plex://abc"])), None);
+        assert_eq!(pick_external_id(&ids(&["tmdb://"])), None);
+        assert_eq!(pick_external_id(&ids(&[])), None);
+    }
 }

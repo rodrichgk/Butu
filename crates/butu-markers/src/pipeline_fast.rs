@@ -107,7 +107,13 @@ pub async fn analyze_fast(
         .flat_map(|s| s.seasons.iter())
         .flat_map(|s| &s.episodes)
         .count();
-    emit(sink.as_ref(), &ProgressEvent::Started { total_shows: shows.len(), total_episodes });
+    emit(
+        sink.as_ref(),
+        &ProgressEvent::Started {
+            total_shows: shows.len(),
+            total_episodes,
+        },
+    );
 
     let mut results: Vec<EpisodeResult> = Vec::new();
 
@@ -123,11 +129,14 @@ pub async fn analyze_fast(
             }
         };
 
-        emit(sink.as_ref(), &ProgressEvent::Show {
-            index: show_idx,
-            title: show.title.clone(),
-            season_count: show.seasons.len(),
-        });
+        emit(
+            sink.as_ref(),
+            &ProgressEvent::Show {
+                index: show_idx,
+                title: show.title.clone(),
+                season_count: show.seasons.len(),
+            },
+        );
 
         let mut show_results = 0usize;
 
@@ -138,10 +147,13 @@ pub async fn analyze_fast(
                 show_results += 1;
                 results.push(er);
             }
-            emit(sink.as_ref(), &ProgressEvent::ShowFinished {
-                title: show.title.clone(),
-                episode_results: show_results,
-            });
+            emit(
+                sink.as_ref(),
+                &ProgressEvent::ShowFinished {
+                    title: show.title.clone(),
+                    episode_results: show_results,
+                },
+            );
             continue;
         }
 
@@ -149,8 +161,15 @@ pub async fn analyze_fast(
             if cancel.load(Ordering::SeqCst) {
                 break;
             }
-            let (intro_detections, credits_detections) =
-                process_season_fast(&runner, &sink, &show.title, season, cancel.clone(), concurrency).await;
+            let (intro_detections, credits_detections) = process_season_fast(
+                &runner,
+                &sink,
+                &show.title,
+                season,
+                cancel.clone(),
+                concurrency,
+            )
+            .await;
 
             let season_results = build_season_markers(
                 &runner,
@@ -170,15 +189,21 @@ pub async fn analyze_fast(
             results.extend(season_results);
         }
 
-        emit(sink.as_ref(), &ProgressEvent::ShowFinished {
-            title: show.title.clone(),
-            episode_results: show_results,
-        });
+        emit(
+            sink.as_ref(),
+            &ProgressEvent::ShowFinished {
+                title: show.title.clone(),
+                episode_results: show_results,
+            },
+        );
     }
 
-    emit(sink.as_ref(), &ProgressEvent::Finished {
-        total_episodes_marked: results.len(),
-    });
+    emit(
+        sink.as_ref(),
+        &ProgressEvent::Finished {
+            total_episodes_marked: results.len(),
+        },
+    );
     Ok(results)
 }
 
@@ -194,11 +219,14 @@ async fn process_season_fast(
     cancel: Arc<AtomicBool>,
     concurrency: usize,
 ) -> (Vec<Option<Detection>>, Vec<Option<Detection>>) {
-    emit(sink.as_ref(), &ProgressEvent::Season {
-        show_title: show_title.into(),
-        season_number: season.season_number,
-        episode_count: season.episodes.len(),
-    });
+    emit(
+        sink.as_ref(),
+        &ProgressEvent::Season {
+            show_title: show_title.into(),
+            season_number: season.season_number,
+            episode_count: season.episodes.len(),
+        },
+    );
 
     let n = season.episodes.len();
     if n < 2 {
@@ -223,30 +251,44 @@ async fn process_season_fast(
                     let has_credits = duration_s > CREDITS_WINDOW_LEN_S + 10;
                     let tail_start_s = duration_s.saturating_sub(CREDITS_WINDOW_LEN_S);
 
-                    emit(sink.as_ref(), &ProgressEvent::Episode {
-                        show_title: title.clone(),
-                        season_number: ep.season,
-                        episode_number: ep.episode,
-                        stage: EpisodeStage::Decoding,
-                    });
+                    emit(
+                        sink.as_ref(),
+                        &ProgressEvent::Episode {
+                            show_title: title.clone(),
+                            season_number: ep.season,
+                            episode_number: ep.episode,
+                            stage: EpisodeStage::Decoding,
+                        },
+                    );
 
-                    let intro_fut =
-                        fingerprint_window(runner.as_ref(), &ep, INTRO_WINDOW_START_S, INTRO_FULL_LEN_S);
+                    let intro_fut = fingerprint_window(
+                        runner.as_ref(),
+                        &ep,
+                        INTRO_WINDOW_START_S,
+                        INTRO_FULL_LEN_S,
+                    );
                     let (intro_res, credits_res) = if has_credits {
-                        let credits_fut =
-                            fingerprint_window(runner.as_ref(), &ep, tail_start_s, CREDITS_WINDOW_LEN_S);
+                        let credits_fut = fingerprint_window(
+                            runner.as_ref(),
+                            &ep,
+                            tail_start_s,
+                            CREDITS_WINDOW_LEN_S,
+                        );
                         let (i, c) = tokio::join!(intro_fut, credits_fut);
                         (i, Some(c))
                     } else {
                         (intro_fut.await, None)
                     };
 
-                    emit(sink.as_ref(), &ProgressEvent::Episode {
-                        show_title: title.clone(),
-                        season_number: ep.season,
-                        episode_number: ep.episode,
-                        stage: EpisodeStage::Done,
-                    });
+                    emit(
+                        sink.as_ref(),
+                        &ProgressEvent::Episode {
+                            show_title: title.clone(),
+                            season_number: ep.season,
+                            episode_number: ep.episode,
+                            stage: EpisodeStage::Done,
+                        },
+                    );
 
                     let intro_fp = log_fp(intro_res, &ep, "intro");
                     let credits_fp = credits_res.and_then(|r| log_fp(r, &ep, "credits"));
@@ -332,8 +374,12 @@ async fn build_season_markers(
                             // fade-to-black when a clean one sits in range; else
                             // keep the reliable theme start.
                             let start = find_credits_fade_before(
-                                runner.as_ref(), &ep.stream_url, ep.headers.as_ref(),
-                                fp_start, CREDITS_MAX_SONG_MS, CREDITS_MIN_SONG_MS,
+                                runner.as_ref(),
+                                &ep.stream_url,
+                                ep.headers.as_ref(),
+                                fp_start,
+                                CREDITS_MAX_SONG_MS,
+                                CREDITS_MIN_SONG_MS,
                             )
                             .await
                             .unwrap_or(fp_start);
@@ -344,7 +390,10 @@ async fn build_season_markers(
                     // (e.g. GoT) — detect the fade-to-black in the tail instead.
                     if credits.is_none() {
                         if let Some(span) = detect_credits_blackframe_tv(
-                            runner.as_ref(), &ep.stream_url, ep.headers.as_ref(), ep.duration_ms,
+                            runner.as_ref(),
+                            &ep.stream_url,
+                            ep.headers.as_ref(),
+                            ep.duration_ms,
                         )
                         .await
                         {
@@ -370,13 +419,16 @@ async fn build_season_markers(
                         .iter()
                         .find(|m| matches!(m.marker_type, MarkerType::Credits))
                         .map(|m| (m.start_ms, m.end_ms));
-                    emit(sink.as_ref(), &ProgressEvent::EpisodeMarkers {
-                        show_title: show_title.clone(),
-                        season_number: ep.season,
-                        episode_number: ep.episode,
-                        intro_ms,
-                        credits_ms,
-                    });
+                    emit(
+                        sink.as_ref(),
+                        &ProgressEvent::EpisodeMarkers {
+                            show_title: show_title.clone(),
+                            season_number: ep.season,
+                            episode_number: ep.episode,
+                            intro_ms,
+                            credits_ms,
+                        },
+                    );
 
                     if markers.is_empty() {
                         return None;
