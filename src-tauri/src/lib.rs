@@ -24,8 +24,33 @@ async fn get_ws_port() -> u16 {
     9001
 }
 
+/// Guards the generic HTTP-proxy commands. They exist to reach user-configured
+/// media servers (Plex/Jellyfin, which legitimately live on localhost/LAN) plus a
+/// few public APIs, so we can't use a strict allow-list. We do reject non-HTTP(S)
+/// schemes and link-local addresses (169.254.0.0/16 / fe80::/10) — the latter
+/// covers the cloud-metadata endpoint (169.254.169.254), a classic SSRF target.
+fn guard_proxy_url(url: &str) -> Result<(), String> {
+    let parsed = reqwest::Url::parse(url).map_err(|e| format!("invalid url: {e}"))?;
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err(format!("blocked url scheme: {}", parsed.scheme()));
+    }
+    if let Some(host) = parsed.host_str() {
+        if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+            let link_local = match ip {
+                std::net::IpAddr::V4(v4) => v4.is_link_local(),
+                std::net::IpAddr::V6(v6) => (v6.segments()[0] & 0xffc0) == 0xfe80,
+            };
+            if link_local {
+                return Err("blocked link-local address".into());
+            }
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 async fn fetch_plex(url: String, headers: HashMap<String, String>) -> Result<String, String> {
+    guard_proxy_url(&url)?;
     let client = reqwest::Client::new();
     let mut req = client.get(&url);
     for (k, v) in &headers {
@@ -41,6 +66,7 @@ async fn fetch_plex(url: String, headers: HashMap<String, String>) -> Result<Str
 
 #[tauri::command]
 async fn fetch_plex_post(url: String, headers: HashMap<String, String>, body: String) -> Result<String, String> {
+    guard_proxy_url(&url)?;
     let client = reqwest::Client::new();
     let mut req = client.post(&url).body(body);
     for (k, v) in &headers {
