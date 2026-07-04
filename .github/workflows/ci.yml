@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  crate:
+    name: butu-markers (fmt / clippy / test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "."
+      - name: rustfmt
+        run: cargo fmt -p butu-markers -p butu-markers-bench --check
+      - name: clippy
+        run: |
+          cargo clippy -p butu-markers --all-features -- -D warnings
+          cargo clippy -p butu-markers-bench -- -D warnings
+      - name: test
+        run: cargo test -p butu-markers --all-features
+
+  web:
+    name: frontend (tsc / build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: typecheck
+        run: npx tsc --noEmit
+      - name: build
+        run: npm run build
