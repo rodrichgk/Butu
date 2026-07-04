@@ -11,6 +11,7 @@ object ButuDestination {
     const val Home   = "home"           // sections: home / movies / music / tv / anime / manga
     const val Detail = "detail/{itemId}"
     const val Player = "player/{itemId}?startMs={startMs}&episodeId={episodeId}"
+    const val Remote = "remote"         // this device driving another Butu screen
 
     fun detail(itemId: String) = "detail/$itemId"
     fun player(itemId: String, startMs: Long = 0L, episodeId: String? = null): String {

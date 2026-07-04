@@ -103,6 +103,16 @@ class ConfigStore @Inject constructor(
 
     suspend fun currentAirMouseEnabled(): Boolean = airMouseEnabled.first()
 
+    // Last TV/host address this phone paired with as a remote (see feature/remote).
+    val airMouseHost: Flow<String?> = context.dataStore.data.map { it[Keys.AirMouseHost] }
+    suspend fun currentAirMouseHost(): String? = airMouseHost.first()
+    suspend fun setAirMouseHost(host: String?) {
+        context.dataStore.edit { prefs ->
+            if (host.isNullOrBlank()) prefs.remove(Keys.AirMouseHost)
+            else prefs[Keys.AirMouseHost] = host
+        }
+    }
+
     // ─── Playback & home preferences (mirror the `settings` slice in useButuStore.ts) ──
     val autoSkipIntro: Flow<Boolean> = context.dataStore.data.map { it[Keys.AutoSkipIntro] ?: false }
     val autoSkipCredits: Flow<Boolean> = context.dataStore.data.map { it[Keys.AutoSkipCredits] ?: false }
@@ -141,6 +151,7 @@ class ConfigStore @Inject constructor(
         val SubLang     = stringPreferencesKey("preferred_subtitle_lang")
         val SubsEnabled = booleanPreferencesKey("subtitles_enabled")
         val AirMouseEnabled = booleanPreferencesKey("air_mouse_enabled")
+        val AirMouseHost = stringPreferencesKey("air_mouse_host")
         val AutoSkipIntro = booleanPreferencesKey("auto_skip_intro")
         val AutoSkipCredits = booleanPreferencesKey("auto_skip_credits")
         val AutoPlayNext = booleanPreferencesKey("auto_play_next")

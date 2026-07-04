@@ -6,11 +6,15 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.nsd.NsdManager
+import android.net.nsd.NsdServiceInfo
+import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import dagger.hilt.android.AndroidEntryPoint
 import dev.butu.R
+import dev.butu.feature.remote.AIR_MOUSE_SERVICE_TYPE
 import io.ktor.server.application.install
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.EmbeddedServer
@@ -47,6 +51,9 @@ class AirMouseService : Service() {
     private val activeConnections = AtomicInteger(0)
     private var server: EmbeddedServer<*, *>? = null
 
+    private var nsdManager: NsdManager? = null
+    private var nsdListener: NsdManager.RegistrationListener? = null
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
@@ -70,6 +77,7 @@ class AirMouseService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        unregisterNsd()
         runCatching { server?.stop(gracePeriodMillis = 500, timeoutMillis = 1_000) }
         repository.onDisconnected(clientAddress = null)
         super.onDestroy()
@@ -120,6 +128,39 @@ class AirMouseService : Service() {
             stopSelf()
             null
         }
+
+        // Advertise on the LAN so remotes discover this TV without a typed IP.
+        if (server != null) registerNsd()
+    }
+
+    private fun registerNsd() {
+        if (nsdListener != null) return
+        val info = NsdServiceInfo().apply {
+            serviceName = "Butu (${Build.MODEL})"
+            serviceType = AIR_MOUSE_SERVICE_TYPE
+            port = WS_PORT
+        }
+        val listener = object : NsdManager.RegistrationListener {
+            override fun onServiceRegistered(info: NsdServiceInfo) {}
+            override fun onRegistrationFailed(info: NsdServiceInfo, errorCode: Int) {}
+            override fun onServiceUnregistered(info: NsdServiceInfo) {}
+            override fun onUnregistrationFailed(info: NsdServiceInfo, errorCode: Int) {}
+        }
+        val manager = getSystemService(NsdManager::class.java)
+        runCatching {
+            manager.registerService(info, NsdManager.PROTOCOL_DNS_SD, listener)
+            nsdManager = manager
+            nsdListener = listener
+        }
+    }
+
+    private fun unregisterNsd() {
+        val manager = nsdManager
+        val listener = nsdListener
+        if (manager != null && listener != null) {
+            runCatching { manager.unregisterService(listener) }
+        }
+        nsdListener = null
     }
 
     private fun handleMessage(raw: String, smoother: ImuSmoother): Boolean {

@@ -20,6 +20,7 @@ import dev.butu.feature.detail.DetailScreen
 import dev.butu.feature.airmouse.AirMouseOverlayHost
 import dev.butu.feature.home.HomeScreen
 import dev.butu.feature.player.PlayerScreen
+import dev.butu.feature.remote.RemoteScreen
 import dev.butu.feature.setup.SetupScreen
 import dev.butu.feature.splash.SplashScreen
 import dev.butu.ui.theme.ButuColors
@@ -96,6 +97,10 @@ fun ButuNavHost(rootViewModel: RootViewModel = hiltViewModel()) {
                         DebugLogger.log(context, "Home quick play: ${item.id} -> Navigating to Player")
                         navController.navigate(ButuDestination.player(item.id))
                     },
+                    onOpenRemote = {
+                        DebugLogger.log(context, "Settings -> Navigating to Remote controller")
+                        navController.navigate(ButuDestination.Remote)
+                    },
                 )
             }
 
@@ -125,6 +130,13 @@ fun ButuNavHost(rootViewModel: RootViewModel = hiltViewModel()) {
             ) {
                 PlayerScreen(onClose = {
                     DebugLogger.log(context, "PlayerScreen onClose callback triggered -> Popping backstack")
+                    navController.popBackStack()
+                })
+            }
+
+            composable(ButuDestination.Remote) {
+                RemoteScreen(onClose = {
+                    DebugLogger.log(context, "RemoteScreen onClose -> Popping backstack")
                     navController.popBackStack()
                 })
             }

@@ -92,6 +92,7 @@ import kotlinx.coroutines.delay
 fun HomeScreen(
     onItemSelect: (MediaItem) -> Unit,
     onPlay: (MediaItem) -> Unit,
+    onOpenRemote: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -151,6 +152,7 @@ fun HomeScreen(
                 infoText = text
                 activeSettingsDialog = "info"
             },
+            onOpenRemote = onOpenRemote,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(start = 80.dp),
@@ -271,6 +273,7 @@ private fun HomeContent(
     onToggleSetting: (String, Boolean) -> Unit,
     onOpenDialog: (String) -> Unit,
     onOpenInfo: (String, String) -> Unit,
+    onOpenRemote: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     AnimatedContent(
@@ -328,6 +331,7 @@ private fun HomeContent(
                 onToggleSetting = onToggleSetting,
                 onOpenDialog = onOpenDialog,
                 onOpenInfo = onOpenInfo,
+                onOpenRemote = onOpenRemote,
             )
         }
     }
@@ -475,6 +479,7 @@ private fun SettingsContent(
     onToggleSetting: (String, Boolean) -> Unit,
     onOpenDialog: (String) -> Unit,
     onOpenInfo: (String, String) -> Unit,
+    onOpenRemote: () -> Unit,
 ) {
     val audioLanguagesMap = remember {
         mapOf("" to "Default", "en" to "English", "fr" to "French", "ja" to "Japanese", "es" to "Spanish", "de" to "German", "zh" to "Chinese", "ko" to "Korean")
@@ -579,9 +584,15 @@ private fun SettingsContent(
                 SettingsGroupLabel("REMOTE")
                 SettingsRow(
                     title = "Air Mouse Bridge",
-                    subtitle = "Pair your phone as an inertial controller/remote",
+                    subtitle = "Host: let a phone drive this screen (ws://$amIp:9001)",
                     statusLabel = amStatus,
                     onClick = { onOpenDialog("air_mouse") }
+                )
+                SettingsRow(
+                    title = "Use This Device as Remote",
+                    subtitle = "Point & click to control another Butu screen over Wi-Fi",
+                    statusLabel = "OPEN",
+                    onClick = onOpenRemote
                 )
 
                 SettingsGroupLabel("LIBRARY")
