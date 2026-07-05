@@ -143,12 +143,20 @@ export default function App() {
 
   const { data: queryLibrary = [] } = useLibraryQuery();
 
+  // Items handed to the player (episodes especially) are NOT in `queryLibrary`
+  // (that holds shows/movies), so `?play=<id>` can't be resolved by a library
+  // lookup alone — a TV episode would resolve to null and the player would never
+  // mount (looking like "click to play → bounces back"). Keep the actual played
+  // items (current + playlist) here; fall back to the library for deep-links.
+  const playedItemsRef = useRef<Map<string, MediaItem>>(new Map());
+
   const selectedMedia = useMemo(() => {
     return detailId ? queryLibrary.find(m => m.id === detailId) || null : null;
   }, [detailId, queryLibrary]);
 
   const playerMediaRaw = useMemo(() => {
-    return playId ? queryLibrary.find(m => m.id === playId) || null : null;
+    if (!playId) return null;
+    return playedItemsRef.current.get(playId) ?? queryLibrary.find(m => m.id === playId) ?? null;
   }, [playId, queryLibrary]);
   const boostVoices = useConfigStore((s) => s.settings.boostVoices);
   const playerMedia = useMemo(() => playerMediaRaw ? applyAudioPrefs(playerMediaRaw, boostVoices) : null, [playerMediaRaw, boostVoices]);
@@ -187,6 +195,10 @@ export default function App() {
     (item: MediaItem, initialTime?: number, playlist?: MediaItem[]) => {
       setPlayerInitialTime(initialTime ?? 0);
       setPlayerPlaylist(playlist ?? []);
+      // Register the item (+ playlist, for auto-next) so `playerMediaRaw` can
+      // resolve `?play=<id>` even for episodes not in the library.
+      playedItemsRef.current.set(item.id, item);
+      (playlist ?? []).forEach((p) => playedItemsRef.current.set(p.id, p));
       setSearchParams((prev) => {
         prev.delete("detail");
         prev.set("play", item.id);
