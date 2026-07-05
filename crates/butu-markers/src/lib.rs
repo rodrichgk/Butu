@@ -30,7 +30,9 @@
 //! let sink: Arc<dyn ProgressSink> = Arc::new(NullSink);
 //! let shows: Vec<ShowInput> = vec![/* … */];
 //! let cancel = Arc::new(AtomicBool::new(false));
-//! let results = analyze_fast(runner, sink, shows, cancel, DEFAULT_CONCURRENCY).await?;
+//! // `None` = no fingerprint cache; pass an `Arc<dyn FingerprintCache>` to reuse
+//! // fingerprints across runs.
+//! let results = analyze_fast(runner, sink, shows, cancel, DEFAULT_CONCURRENCY, None).await?;
 //! # Ok(()) }
 //! ```
 // Numbered / bulleted lists in the module docs read fine as-is.
@@ -40,6 +42,7 @@
 #![allow(clippy::needless_range_loop)]
 
 pub mod audio;
+pub mod cache;
 pub mod detect;
 pub mod fingerprint;
 pub mod pipeline;
@@ -50,6 +53,7 @@ pub mod segment;
 pub mod types;
 
 // ── Curated public API ────────────────────────────────────────────────────────
+pub use cache::FingerprintCache;
 pub use pipeline::{analyze, CancelFlag};
 pub use pipeline_fast::{analyze_fast, DEFAULT_CONCURRENCY};
 pub use progress::{NullSink, ProgressSink};

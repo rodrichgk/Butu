@@ -68,8 +68,8 @@ impl KalmanFilter {
 pub struct ImuSmoother {
     beta_filter: KalmanFilter,
     gamma_filter: KalmanFilter,
-    screen_width: f64,
-    screen_height: f64,
+    _screen_width: f64,
+    _screen_height: f64,
 }
 
 impl ImuSmoother {
@@ -77,8 +77,8 @@ impl ImuSmoother {
         Self {
             beta_filter: KalmanFilter::new(0.0),
             gamma_filter: KalmanFilter::new(0.0),
-            screen_width,
-            screen_height,
+            _screen_width: screen_width,
+            _screen_height: screen_height,
         }
     }
 

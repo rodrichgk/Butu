@@ -8,7 +8,7 @@
 
 use std::path::Path;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::runner::MediaRunner;
 
@@ -20,6 +20,7 @@ struct FpcalcRawOut {
     fingerprint: Vec<u32>,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Fingerprint {
     pub hashes: Vec<u32>,
     pub duration_secs: f64,

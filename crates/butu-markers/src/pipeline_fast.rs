@@ -23,6 +23,7 @@ use std::sync::Arc;
 use futures_util::stream::{self, StreamExt};
 
 use crate::audio::{cleanup_pcm, extract_pcm_window_fast, CHANNELS, SAMPLE_RATE_FAST};
+use crate::cache::FingerprintCache;
 use crate::detect::{detect_markers, Detection};
 use crate::fingerprint::{fingerprint_pcm_rate, Fingerprint};
 use crate::pipeline::{pick_external_id, process_movie};
@@ -100,6 +101,7 @@ pub async fn analyze_fast(
     shows: Vec<ShowInput>,
     cancel: Arc<AtomicBool>,
     concurrency: usize,
+    cache: Option<Arc<dyn FingerprintCache>>,
 ) -> Result<Vec<EpisodeResult>, String> {
     let concurrency = concurrency.max(1);
     let total_episodes: usize = shows
@@ -168,6 +170,7 @@ pub async fn analyze_fast(
                 season,
                 cancel.clone(),
                 concurrency,
+                cache.clone(),
             )
             .await;
 
@@ -218,6 +221,7 @@ async fn process_season_fast(
     season: &SeasonInput,
     cancel: Arc<AtomicBool>,
     concurrency: usize,
+    cache: Option<Arc<dyn FingerprintCache>>,
 ) -> (Vec<Option<Detection>>, Vec<Option<Detection>>) {
     emit(
         sink.as_ref(),
@@ -239,10 +243,10 @@ async fn process_season_fast(
     let phase_a: Vec<(usize, Option<Fingerprint>, Option<Fingerprint>)> =
         stream::iter(season.episodes.iter().cloned().enumerate())
             .map(|(idx, ep)| {
-                let runner = runner.clone();
                 let sink = sink.clone();
                 let cancel = cancel.clone();
                 let title = title.clone();
+                let cache = cache.clone();
                 async move {
                     if cancel.load(Ordering::SeqCst) {
                         return (idx, None, None);
@@ -266,6 +270,7 @@ async fn process_season_fast(
                         &ep,
                         INTRO_WINDOW_START_S,
                         INTRO_FULL_LEN_S,
+                        cache.as_deref(),
                     );
                     let (intro_res, credits_res) = if has_credits {
                         let credits_fut = fingerprint_window(
@@ -273,6 +278,7 @@ async fn process_season_fast(
                             &ep,
                             tail_start_s,
                             CREDITS_WINDOW_LEN_S,
+                            cache.as_deref(),
                         );
                         let (i, c) = tokio::join!(intro_fut, credits_fut);
                         (i, Some(c))
@@ -458,11 +464,24 @@ async fn fingerprint_window(
     ep: &EpisodeInput,
     start_s: u64,
     len_s: u64,
+    cache: Option<&dyn FingerprintCache>,
 ) -> Result<Fingerprint, String> {
+    let key = format!("{}|{}|{}|{}", ep.id, start_s, len_s, ep.duration_ms);
+    if let Some(c) = cache {
+        if let Some(fp) = c.get(&key) {
+            return Ok(fp);
+        }
+    }
+
     let pcm = extract_pcm_window_fast(runner, &ep.stream_url, ep.headers.as_ref(), start_s, len_s)
         .await?;
     let result = fingerprint_pcm_rate(runner, &pcm, len_s as u32, SAMPLE_RATE_FAST, CHANNELS).await;
     cleanup_pcm(&pcm);
+
+    if let (Ok(fp), Some(c)) = (&result, cache) {
+        c.put(&key, fp);
+    }
+
     result
 }
 
@@ -475,5 +494,102 @@ fn log_fp(res: Result<Fingerprint, String>, ep: &EpisodeInput, which: &str) -> O
             tracing::warn!("episode {} {which} fingerprint failed: {e}", ep.id);
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::progress::NullSink;
+    use crate::runner::CmdOutput;
+    use async_trait::async_trait;
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+
+    struct FakeRunner;
+    #[async_trait]
+    impl MediaRunner for FakeRunner {
+        async fn ffmpeg(&self, _args: &[String]) -> Result<CmdOutput, String> {
+            Ok(CmdOutput {
+                code: 0,
+                stdout: vec![],
+                stderr: "".into(),
+            })
+        }
+        async fn fpcalc(&self, _args: &[String]) -> Result<CmdOutput, String> {
+            panic!("Runner should not be called on cache hit");
+        }
+    }
+
+    struct FakeCache {
+        store: Mutex<HashMap<String, Fingerprint>>,
+    }
+    impl FingerprintCache for FakeCache {
+        fn get(&self, key: &str) -> Option<Fingerprint> {
+            self.store.lock().unwrap().get(key).cloned()
+        }
+        fn put(&self, key: &str, fp: &Fingerprint) {
+            self.store
+                .lock()
+                .unwrap()
+                .insert(key.to_string(), fp.clone());
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cache_hit_skips_runner() {
+        let runner: Arc<dyn MediaRunner> = Arc::new(FakeRunner);
+        let sink: Arc<dyn ProgressSink> = Arc::new(NullSink);
+        let cancel = Arc::new(AtomicBool::new(false));
+
+        let mut store = HashMap::new();
+        // The exact key format: {}|{}|{}|{}
+        // For intro: "ep1|0|900|3000000"
+        let fp = Fingerprint {
+            duration_secs: 900.0,
+            hashes: vec![1, 2, 3],
+        };
+        store.insert("ep1|0|900|3000000".to_string(), fp.clone());
+        // For credits (has_credits = true): "ep1|2400|600|3000000"
+        store.insert("ep1|2400|600|3000000".to_string(), fp.clone());
+        // Same for ep2
+        store.insert("ep2|0|900|3000000".to_string(), fp.clone());
+        store.insert("ep2|2400|600|3000000".to_string(), fp.clone());
+
+        let cache: Arc<dyn FingerprintCache> = Arc::new(FakeCache {
+            store: Mutex::new(store),
+        });
+
+        let shows = vec![ShowInput {
+            title: "Test Show".into(),
+            external_ids: vec!["tmdb://123".into()],
+            kind: MediaKind::Tv,
+            seasons: vec![SeasonInput {
+                season_number: 1,
+                episodes: vec![
+                    EpisodeInput {
+                        id: "ep1".into(),
+                        stream_url: "fake".into(),
+                        duration_ms: 3_000_000,
+                        season: 1,
+                        episode: 1,
+                        headers: None,
+                    },
+                    EpisodeInput {
+                        id: "ep2".into(),
+                        stream_url: "fake".into(),
+                        duration_ms: 3_000_000,
+                        season: 1,
+                        episode: 2,
+                        headers: None,
+                    },
+                ],
+            }],
+        }];
+
+        // If the cache wasn't hit, the FakeRunner would panic
+        let _res = analyze_fast(runner, sink, shows, cancel, 2, Some(cache))
+            .await
+            .unwrap();
     }
 }

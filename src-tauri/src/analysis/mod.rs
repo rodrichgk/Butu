@@ -7,4 +7,5 @@
 //! over the bundled ffmpeg/fpcalc sidecars and `app.emit`.
 
 pub mod commands;
+pub mod cache;
 mod tauri_runner;

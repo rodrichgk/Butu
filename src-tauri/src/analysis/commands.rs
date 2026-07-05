@@ -15,6 +15,8 @@ use butu_markers::{
 };
 
 use crate::analysis::tauri_runner::{TauriRunner, TauriSink};
+use crate::analysis::cache::FileFingerprintCache;
+use butu_markers::FingerprintCache;
 
 /// Which detection algorithm to run. `Fast` is the default and the only one the
 /// UI selects — it's the concurrent, remote-optimized pipeline with the accurate
@@ -79,7 +81,9 @@ pub async fn analyze_library(
         Analyzer::Legacy => analyze(runner, sink, args.shows, cancel).await,
         Analyzer::Fast => {
             let concurrency = args.concurrency.unwrap_or(DEFAULT_CONCURRENCY);
-            analyze_fast(runner, sink, args.shows, cancel, concurrency).await
+            let cache_dir = app.path().app_cache_dir().unwrap_or_else(|_| std::env::temp_dir());
+            let cache: Arc<dyn FingerprintCache> = Arc::new(FileFingerprintCache::new(cache_dir));
+            analyze_fast(runner, sink, args.shows, cancel, concurrency, Some(cache)).await
         }
     };
 
