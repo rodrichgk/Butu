@@ -43,7 +43,7 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         >
-          <Logo size={84} glow />
+          <Logo size={132} glow />
           <h1 className="font-display font-black mt-5" style={{ fontSize: "clamp(2.5rem, 9vw, 4.5rem)", letterSpacing: "-0.02em" }}>
             Butu
           </h1>
