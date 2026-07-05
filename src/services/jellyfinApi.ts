@@ -147,9 +147,42 @@ export function imageUrl(
   return `${base}/Items/${itemId}/Images/${type}?maxWidth=${maxWidth}&api_key=${cfg.token}`;
 }
 
-export function streamUrl(cfg: JellyfinConfig, itemId: string): string {
+export interface JellyfinTrack {
+  id: number;
+  type: "Audio" | "Subtitle";
+  label: string;
+  language?: string;
+}
+
+export async function fetchJellyfinTracks(
+  cfg: JellyfinConfig,
+  itemId: string
+): Promise<JellyfinTrack[]> {
   const base = cfg.serverUrl.replace(/\/$/, "");
-  return `${base}/Videos/${itemId}/stream?static=true&api_key=${cfg.token}`;
+  const res = await fetch(`${base}/Users/${cfg.userId}/Items/${itemId}?Fields=MediaSources`, {
+    headers: authHeader(cfg.token)
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  const ms = data.MediaSources?.[0];
+  if (!ms || !ms.MediaStreams) return [];
+  
+  return ms.MediaStreams
+    .filter((s: any) => s.Type === "Audio" || s.Type === "Subtitle")
+    .map((s: any) => ({
+      id: s.Index,
+      type: s.Type as "Audio" | "Subtitle",
+      label: s.DisplayTitle || s.Title || s.Language || `${s.Type} ${s.Index}`,
+      language: s.Language,
+    }));
+}
+
+export function streamUrl(cfg: JellyfinConfig, itemId: string, audioIndex?: number | null, subtitleIndex?: number | null): string {
+  const base = cfg.serverUrl.replace(/\/$/, "");
+  let u = `${base}/Videos/${itemId}/stream?static=true&api_key=${cfg.token}`;
+  if (audioIndex != null) u += `&AudioStreamIndex=${audioIndex}`;
+  if (subtitleIndex != null) u += `&SubtitleStreamIndex=${subtitleIndex}`;
+  return u;
 }
 
 // ─── Playback reporting ───────────────────────────────────────────────────────

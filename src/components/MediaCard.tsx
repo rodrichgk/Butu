@@ -6,10 +6,13 @@ import { reducedMotion } from "../utils/platform";
 interface MediaCardProps {
   item: MediaItem;
   size?: "standard" | "double-wide" | "featured";
+  forceAspect?: "wide" | "poster";
   onSelect: (item: MediaItem) => void;
 }
 
-function getCardClass(type: MediaItem["type"]): string {
+function getCardClass(type: MediaItem["type"], forceAspect?: "wide" | "poster"): string {
+  if (forceAspect === "wide") return "card-wide";
+  if (forceAspect === "poster") return "card-poster";
   switch (type) {
     case "movie": case "anime": case "manga": return "card-poster";
     case "music":                             return "card-album";
@@ -20,7 +23,9 @@ function getCardClass(type: MediaItem["type"]): string {
 
 // Responsive widths. Phone (base) sizes are bumped up for comfortable touch
 // browsing; tablet (md) and desktop/TV (lg) sizes are unchanged.
-function getCardWidth(type: MediaItem["type"]): string {
+function getCardWidth(type: MediaItem["type"], forceAspect?: "wide" | "poster"): string {
+  if (forceAspect === "wide") return "w-64 md:w-72 lg:w-80";
+  if (forceAspect === "poster") return "w-40 sm:w-44 lg:w-52";
   switch (type) {
     case "movie": case "anime": case "manga": case "music":
       return "w-40 sm:w-44 lg:w-52";   // phone 160 → desktop 208px
@@ -42,9 +47,9 @@ function CodecBadge({ codec }: { codec: string }) {
 
 // memo — card only re-renders if its own item or onSelect reference changes.
 // No Zustand subscription — focus state is handled purely via CSS :focus / :hover.
-export const MediaCard = memo(function MediaCard({ item, onSelect }: MediaCardProps) {
-  const cardClass  = getCardClass(item.type);
-  const widthClass = getCardWidth(item.type);
+export const MediaCard = memo(function MediaCard({ item, forceAspect, onSelect }: MediaCardProps) {
+  const cardClass  = getCardClass(item.type, forceAspect);
+  const widthClass = getCardWidth(item.type, forceAspect);
   const [imgFailed, setImgFailed] = useState(false);
 
   return (

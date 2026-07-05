@@ -130,7 +130,7 @@ function useFilteredLibrary(activeSection: string, storeLibrary: MediaItem[]) {
 
 
 export default function App() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -140,6 +140,15 @@ export default function App() {
   const [searchParams, setSearchParams] = useSearchParams();
   const detailId = searchParams.get("detail");
   const playId = searchParams.get("play");
+
+  // Ensure the URL always has a language prefix
+  useEffect(() => {
+    const parts = location.pathname.split("/").filter(Boolean);
+    if (parts.length === 0 || (parts[0] !== "en" && parts[0] !== "fr")) {
+      const lang = i18n.language?.startsWith("fr") ? "fr" : "en";
+      navigate(`/${lang}${location.pathname}`, { replace: true });
+    }
+  }, [location.pathname, navigate, i18n.language]);
 
   const { data: queryLibrary = [] } = useLibraryQuery();
 
@@ -284,13 +293,38 @@ export default function App() {
     },
     [playerMedia, playerPlaylist, saveProgress, settings.autoPlayNext, navigate, setSearchParams]
   );
+
+  const playlistIdx = useMemo(() => {
+    if (!playerMedia || playerPlaylist.length === 0) return -1;
+    return playerPlaylist.findIndex((p) => p.id === playerMedia.id);
+  }, [playerMedia, playerPlaylist]);
+
+  const hasNext = playlistIdx >= 0 && playlistIdx < playerPlaylist.length - 1;
+  const hasPrev = playlistIdx > 0;
+
+  const handleNextTrack = useCallback(() => {
+    if (!hasNext) return;
+    const next = playerPlaylist[playlistIdx + 1];
+    setPlayerInitialTime(0);
+    setSearchParams((prev) => { prev.set("play", next.id); return prev; }, { replace: true });
+  }, [hasNext, playerPlaylist, playlistIdx, setSearchParams]);
+
+  const handlePrevTrack = useCallback(() => {
+    if (!hasPrev) return;
+    const prev = playerPlaylist[playlistIdx - 1];
+    setPlayerInitialTime(0);
+    setSearchParams((prevParams) => { prevParams.set("play", prev.id); return prevParams; }, { replace: true });
+  }, [hasPrev, playerPlaylist, playlistIdx, setSearchParams]);
+
   const setActiveSection = useCallback((val: string) => navigate(getLocalizedPath(val === "home" ? "/" : `/${val}`, location.pathname.split("/").filter(Boolean)[0] === "fr" ? "fr" : "en")), [navigate, location.pathname]);
   const serverType       = useConfigStore((s) => s.serverType);
   
-  // Landing → setup gate. Show the explainer first; once connected (or on a later disconnect)
-  // it resets so a signed-out visitor always lands on the explainer, not straight on the form.
-  const [showSetup, setShowSetup] = useState(false);
-  useEffect(() => { if (serverType) setShowSetup(false); }, [serverType]);
+  // Landing → setup gate. Once a server is connected, it resets so a signed-out visitor always lands on the explainer, not straight on the form.
+  useEffect(() => { 
+    if (serverType && activeSection === "connect") {
+      setActiveSection("home"); 
+    }
+  }, [serverType, activeSection, setActiveSection]);
   
   
 
@@ -421,7 +455,11 @@ export default function App() {
     // liquid cursor here (it depends on the magnetic-snap system these screens don't wire up).
     return (
       <Suspense fallback={null}>
-        {showSetup ? <MediaSetup /> : <Landing onGetStarted={() => setShowSetup(true)} />}
+        {activeSection === "connect" ? (
+          <MediaSetup />
+        ) : (
+          <Landing onGetStarted={() => setActiveSection("connect")} />
+        )}
       </Suspense>
     );
   }
@@ -454,156 +492,117 @@ export default function App() {
         )}
 
         <motion.div
-          key={activeSection}
+          key={location.pathname}
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
           className="pb-20"
         >
-          {activeSection === "home" && (
-            <>
-              {settings.showContinueWatching && continueWatching.length > 0 && (
-                <MediaStage
-                  title={t("categories.continue_watching")}
-                  items={continueWatching}
-                  onSelect={handleItemSelect}
-                  metaLabel="RESUME PLAYBACK"
-                />
-              )}
-              {movies.length > 0 && (
-                <MediaStage
-                  title={t("categories.cinema")}
-                  items={movies}
-                  onSelect={handleItemSelect}
-                  metaLabel="MOVIES · FILM LIBRARY"
-                />
-              )}
-              {tv.length > 0 && (
-                <MediaStage
-                  title={t("categories.prestige_tv")}
-                  items={tv}
-                  onSelect={handleItemSelect}
-                  metaLabel="TV SERIES · EPISODES"
-                />
-              )}
-              {anime.length > 0 && (
-                <MediaStage
-                  title={t("categories.anime")}
-                  items={anime}
-                  onSelect={handleItemSelect}
-                  metaLabel="ANIME · SEASONS"
-                />
-              )}
-              {manga.length > 0 && (
-                <MediaStage
-                  title={t("categories.manga")}
-                  items={manga}
-                  onSelect={handleItemSelect}
-                  metaLabel="MANGA · VOLUMES"
-                />
-              )}
-              {music.length > 0 && (
-                <MediaStage
-                  title={t("categories.sound_stage")}
-                  items={music}
-                  onSelect={handleItemSelect}
-                  metaLabel="MUSIC · ALBUMS"
-                />
-              )}
-            </>
-          )}
+          <Routes>
+            <Route path="/:lang">
+              <Route index element={
+                <>
+                  {settings.showContinueWatching && continueWatching.length > 0 && (
+                    <MediaStage
+                      title={t("categories.continue_watching")}
+                      items={continueWatching}
+                      onSelect={handleItemSelect}
+                      metaLabel="RESUME PLAYBACK"
+                      forceAspect="wide"
+                    />
+                  )}
+                  {movies.length > 0 && (
+                    <MediaStage title={t("categories.cinema")} items={movies} onSelect={handleItemSelect} metaLabel="MOVIES · FILM LIBRARY" />
+                  )}
+                  {tv.length > 0 && (
+                    <MediaStage title={t("categories.prestige_tv")} items={tv} onSelect={handleItemSelect} metaLabel="TV SERIES · EPISODES" />
+                  )}
+                  {anime.length > 0 && (
+                    <MediaStage title={t("categories.anime")} items={anime} onSelect={handleItemSelect} metaLabel="ANIME · SEASONS" />
+                  )}
+                  {manga.length > 0 && (
+                    <MediaStage title={t("categories.manga")} items={manga} onSelect={handleItemSelect} metaLabel="MANGA · VOLUMES" />
+                  )}
+                  {music.length > 0 && (
+                    <MediaStage title={t("categories.sound_stage")} items={music} onSelect={handleItemSelect} metaLabel="MUSIC · ALBUMS" />
+                  )}
+                  {source.length === 0 && <HomeStatus />}
+                </>
+              } />
+              
+              <Route path="movies" element={
+                movies.length > 0 && (
+                  <div className="pt-8">
+                    <div className="px-4 sm:px-8 lg:px-20 mb-8">
+                      <h1 className="font-display font-black text-on_surface" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>{t("categories.cinema")}</h1>
+                      <p className="font-mono-tech text-on_surface_variant text-sm mt-1">{movies.length} TITLES · FILM LIBRARY</p>
+                    </div>
+                    <MediaStage title={t("categories.all_movies")} items={movies} onSelect={handleItemSelect} />
+                  </div>
+                )
+              } />
 
-          {activeSection === "movies" && movies.length > 0 && (
-            <div className="pt-8">
-              <div className="px-4 sm:px-8 lg:px-20 mb-8">
-                <h1 className="font-display font-black text-on_surface" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
-                  {t("categories.cinema")}
-                </h1>
-                <p className="font-mono-tech text-on_surface_variant text-sm mt-1">
-                  {movies.length} TITLES · FILM LIBRARY
-                </p>
-              </div>
-              <MediaStage title={t("categories.all_movies")} items={movies} onSelect={handleItemSelect} />
-            </div>
-          )}
+              <Route path="anime" element={
+                anime.length > 0 && (
+                  <div className="pt-8">
+                    <div className="px-4 sm:px-8 lg:px-20 mb-8">
+                      <h1 className="font-display font-black text-on_surface" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>{t("categories.anime")}</h1>
+                      <p className="font-mono-tech text-on_surface_variant text-sm mt-1">{anime.length} SERIES · SEASONS & EPISODES</p>
+                    </div>
+                    <MediaStage title={t("categories.all_anime")} items={anime} onSelect={handleItemSelect} />
+                  </div>
+                )
+              } />
 
-          {activeSection === "anime" && anime.length > 0 && (
-            <div className="pt-8">
-              <div className="px-4 sm:px-8 lg:px-20 mb-8">
-                <h1 className="font-display font-black text-on_surface" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
-                  {t("categories.anime")}
-                </h1>
-                <p className="font-mono-tech text-on_surface_variant text-sm mt-1">
-                  {anime.length} SERIES · SEASONS & EPISODES
-                </p>
-              </div>
-              <MediaStage title={t("categories.all_anime")} items={anime} onSelect={handleItemSelect} />
-            </div>
-          )}
+              <Route path="manga" element={
+                manga.length > 0 && (
+                  <div className="pt-8">
+                    <div className="px-4 sm:px-8 lg:px-20 mb-8">
+                      <h1 className="font-display font-black text-on_surface" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>{t("categories.manga")}</h1>
+                      <p className="font-mono-tech text-on_surface_variant text-sm mt-1">{manga.length} TITLES · VOLUMES</p>
+                    </div>
+                    <MediaStage title={t("categories.all_manga")} items={manga} onSelect={handleItemSelect} />
+                  </div>
+                )
+              } />
 
-          {activeSection === "manga" && manga.length > 0 && (
-            <div className="pt-8">
-              <div className="px-4 sm:px-8 lg:px-20 mb-8">
-                <h1 className="font-display font-black text-on_surface" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
-                  {t("categories.manga")}
-                </h1>
-                <p className="font-mono-tech text-on_surface_variant text-sm mt-1">
-                  {manga.length} TITLES · VOLUMES
-                </p>
-              </div>
-              <MediaStage title={t("categories.all_manga")} items={manga} onSelect={handleItemSelect} />
-            </div>
-          )}
+              <Route path="music" element={
+                music.length > 0 && (
+                  <div className="pt-8">
+                    <div className="px-4 sm:px-8 lg:px-20 mb-8">
+                      <h1 className="font-display font-black text-on_surface" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>{t("categories.sound_stage")}</h1>
+                      <p className="font-mono-tech text-on_surface_variant text-sm mt-1">{music.length} ALBUMS · HI-FI AUDIO</p>
+                    </div>
+                    <MediaStage title={t("categories.albums")} items={music} onSelect={handleItemSelect} />
+                  </div>
+                )
+              } />
 
-          {activeSection === "music" && music.length > 0 && (
-            <div className="pt-8">
-              <div className="px-4 sm:px-8 lg:px-20 mb-8">
-                <h1 className="font-display font-black text-on_surface" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
-                  {t("categories.sound_stage")}
-                </h1>
-                <p className="font-mono-tech text-on_surface_variant text-sm mt-1">
-                  {music.length} ALBUMS · HI-FI AUDIO
-                </p>
-              </div>
-              <MediaStage title={t("categories.albums")} items={music} onSelect={handleItemSelect} />
-            </div>
-          )}
+              <Route path="tv" element={
+                tv.length > 0 && (
+                  <div className="pt-8">
+                    <div className="px-4 sm:px-8 lg:px-20 mb-8">
+                      <h1 className="font-display font-black text-on_surface" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>{t("categories.prestige_tv")}</h1>
+                      <p className="font-mono-tech text-on_surface_variant text-sm mt-1">{tv.length} SERIES · STREAMING QUALITY</p>
+                    </div>
+                    <MediaStage title={t("categories.series")} items={tv} onSelect={handleItemSelect} />
+                  </div>
+                )
+              } />
 
-          {activeSection === "tv" && tv.length > 0 && (
-            <div className="pt-8">
-              <div className="px-4 sm:px-8 lg:px-20 mb-8">
-                <h1 className="font-display font-black text-on_surface" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
-                  {t("categories.prestige_tv")}
-                </h1>
-                <p className="font-mono-tech text-on_surface_variant text-sm mt-1">
-                  {tv.length} SERIES · STREAMING QUALITY
-                </p>
-              </div>
-              <MediaStage title={t("categories.series")} items={tv} onSelect={handleItemSelect} />
-            </div>
-          )}
+              <Route path="browse" element={
+                <Suspense fallback={null}><BrowseView /></Suspense>
+              } />
 
-          {activeSection === "browse" && (
-            <Suspense fallback={null}>
-              <BrowseView />
-            </Suspense>
-          )}
+              <Route path="search" element={
+                <Suspense fallback={null}><SearchView onSelect={handleItemSelect} /></Suspense>
+              } />
 
-          {activeSection === "search" && (
-            <Suspense fallback={null}>
-              <SearchView onSelect={handleItemSelect} />
-            </Suspense>
-          )}
-
-          {activeSection === "settings" && (
-            <Suspense fallback={null}>
-              <SettingsView />
-            </Suspense>
-          )}
-
-          {activeSection === "home" && source.length === 0 && (
-            <HomeStatus />
-          )}
+              <Route path="settings" element={
+                <Suspense fallback={null}><SettingsView /></Suspense>
+              } />
+            </Route>
+          </Routes>
         </motion.div>
         </main>
       </div>{/* end bg layer */}
@@ -626,6 +625,10 @@ export default function App() {
             <ButuPlayer
               item={playerMedia}
               initialTime={playerInitialTime}
+              hasNext={hasNext}
+              hasPrev={hasPrev}
+              onNext={handleNextTrack}
+              onPrev={handlePrevTrack}
               onClose={handleClosePlayer}
               onProgress={handlePlayerProgress}
               onEnded={handlePlayerEnded}

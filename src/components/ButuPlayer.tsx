@@ -10,13 +10,18 @@ import {
   secondsToTicks,
 } from "../services/jellyfinApi";
 import { fetchMarkers, CloudMarker } from "../services/markerService";
-import { fetchPlexSubtitleTracks, applyPlexSubtitle, type PlexSubtitleTrack } from "../services/plexApi";
+import { fetchJellyfinTracks, streamUrl as buildJellyfinStreamUrl, type JellyfinTrack } from "../services/jellyfinApi";
+import { fetchPlexTracks, applyPlexTracks, type PlexTrack } from "../services/plexApi";
 import { useTranslation } from "react-i18next";
 import { isTouch } from "../utils/platform";
 
 interface ButuPlayerProps {
   item: MediaItem;
   initialTime?: number;
+  hasNext?: boolean;
+  hasPrev?: boolean;
+  onNext?: () => void;
+  onPrev?: () => void;
   onClose: (progress?: { time: number; duration?: number; season?: number; episode?: number }) => void;
   onProgress?: (progress: { time: number; duration?: number; season?: number; episode?: number }) => void;
   onEnded?: (progress?: { time: number; duration?: number; season?: number; episode?: number }) => void;
@@ -30,7 +35,7 @@ function formatTime(s: number): string {
   return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
-export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
+export function ButuPlayer({ item, initialTime, hasNext, hasPrev, onNext, onPrev, onClose, onProgress, onEnded }: ButuPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const seekBarRef = useRef<HTMLDivElement>(null);
   const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,10 +52,10 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
   const [activeMarker, setActiveMarker] = useState<CloudMarker | null>(null);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
 
-  // Subtitles (Plex desktop): the webview can't toggle a burned-in track, so picking one
-  // rebuilds the stream with that subtitle burned in and reloads at the current position.
-  const [subtitleTracks, setSubtitleTracks] = useState<PlexSubtitleTrack[]>([]);
-  const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
+  type GenericTrack = { id: string | number; type: "Audio" | "Subtitle"; label: string; language?: string };
+  const [tracks, setTracks] = useState<GenericTrack[]>([]);
+  const [selectedSubId, setSelectedSubId] = useState<string | number | null>(null);
+  const [selectedAudioId, setSelectedAudioId] = useState<string | number | null>(null);
   const [showSubMenu, setShowSubMenu] = useState(false);
   const [subUrl, setSubUrl] = useState<string | null>(null);
   const resumeAtRef = useRef<number | null>(null);
@@ -63,8 +68,6 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
   const progressTimer    = useRef<ReturnType<typeof setInterval> | null>(null);
   const { t } = useTranslation();
 
-  // The native Android (ExoBridge) build plays through ExoPlayer, not this <video>, so the
-  // burn-and-reload subtitle path only applies to the desktop/webview player.
   const hasExoBridge = typeof window !== "undefined" && !!(window as any).ExoBridge;
 
   const ambientColor = item.ambientColor ?? "#99f7ff";
@@ -87,27 +90,56 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
     fetchMarkers(item, ep).then((fetched) => setMarkers(fetched));
   }, [item]);
 
-  // Load the item's subtitle tracks (Plex desktop only) so the CC menu can list them.
   useEffect(() => {
-    if (hasExoBridge || serverType !== "plex" || !plexConfig) { setSubtitleTracks([]); return; }
+    if (hasExoBridge) return;
     let cancelled = false;
-    fetchPlexSubtitleTracks(plexConfig, item.id)
-      .then((t) => { if (!cancelled) setSubtitleTracks(t); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [item.id, serverType, plexConfig, hasExoBridge]);
 
-  const selectSubtitle = useCallback(async (subId: string | null) => {
+    if (serverType === "plex" && plexConfig) {
+      fetchPlexTracks(plexConfig, item.id)
+        .then((t) => { if (!cancelled) setTracks(t); })
+        .catch(() => {});
+    } else if (serverType === "jellyfin" && jellyfinConfig) {
+      fetchJellyfinTracks(jellyfinConfig, item.id)
+        .then((t) => { if (!cancelled) setTracks(t); })
+        .catch(() => {});
+    }
+
+    return () => { cancelled = true; };
+  }, [item.id, serverType, plexConfig, jellyfinConfig, hasExoBridge]);
+
+  const selectTrack = useCallback(async (type: "Audio" | "Subtitle", trackId: string | number | null) => {
     setShowSubMenu(false);
     resetControlsTimer();
-    if (serverType !== "plex" || !plexConfig) return;
-    const baseUrl = subUrl ?? item.streamUrl ?? item.url;
+
+    let newSubId = selectedSubId;
+    let newAudioId = selectedAudioId;
+
+    if (type === "Subtitle") {
+      newSubId = trackId;
+      setSelectedSubId(trackId);
+    } else {
+      newAudioId = trackId;
+      setSelectedAudioId(trackId);
+    }
+
+    const baseUrl = item.streamUrl ?? item.url;
     if (!baseUrl) return;
-    const newUrl = await applyPlexSubtitle(baseUrl, plexConfig, subId);
+
+    let newUrl = baseUrl;
+    if (serverType === "plex" && plexConfig) {
+      newUrl = await applyPlexTracks(subUrl ?? baseUrl, plexConfig, newSubId ? String(newSubId) : null, newAudioId ? String(newAudioId) : null);
+    } else if (serverType === "jellyfin" && jellyfinConfig) {
+      newUrl = buildJellyfinStreamUrl(
+        jellyfinConfig, 
+        item.id, 
+        newAudioId as number | undefined, 
+        newSubId as number | undefined
+      );
+    }
+
     resumeAtRef.current = videoRef.current?.currentTime ?? 0;
-    setSelectedSubId(subId);
     setSubUrl(newUrl);
-  }, [serverType, plexConfig, subUrl, item.streamUrl, item.url, resetControlsTimer]);
+  }, [serverType, plexConfig, jellyfinConfig, subUrl, item.streamUrl, item.url, resetControlsTimer, selectedSubId, selectedAudioId, item.id]);
 
   // Reload the <video> when the subtitle-rebuilt URL changes; onCanPlay restores the position.
   useEffect(() => {
@@ -592,6 +624,31 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
                 </div>
 
                 <div className="flex items-center gap-3 md:gap-4 justify-self-center">
+                  {hasPrev && (
+                    <motion.button
+                      data-magnetic
+                      data-magnetic-id="player-prev"
+                      onClick={() => {
+                        if (onPrev) onPrev();
+                        resetControlsTimer();
+                      }}
+                      className="flex items-center justify-center w-11 h-11 rounded-full"
+                      style={{
+                        background: "rgba(22,26,38,0.6)",
+                        backdropFilter: "blur(20px)",
+                        border: "1px solid rgba(46,52,71,0.3)",
+                        color: "#9aa3b4",
+                      }}
+                      whileHover={{ scale: 1.08, color: "#e0e6f0" }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="19,20 9,12 19,4" />
+                        <rect x="5" y="4" width="2" height="16" />
+                      </svg>
+                    </motion.button>
+                  )}
+
                   <motion.button
                     data-magnetic
                     data-magnetic-id="player-rewind"
@@ -664,6 +721,31 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
                       <path d="M20.49,15a9,9,0,1,1-.49-3.34" />
                     </svg>
                   </motion.button>
+
+                  {hasNext && (
+                    <motion.button
+                      data-magnetic
+                      data-magnetic-id="player-next"
+                      onClick={() => {
+                        if (onNext) onNext();
+                        resetControlsTimer();
+                      }}
+                      className="flex items-center justify-center w-11 h-11 rounded-full"
+                      style={{
+                        background: "rgba(22,26,38,0.6)",
+                        backdropFilter: "blur(20px)",
+                        border: "1px solid rgba(46,52,71,0.3)",
+                        color: "#9aa3b4",
+                      }}
+                      whileHover={{ scale: 1.08, color: "#e0e6f0" }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5,4 15,12 5,20" />
+                        <rect x="17" y="4" width="2" height="16" />
+                      </svg>
+                    </motion.button>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 md:gap-3 justify-self-end">
@@ -672,17 +754,17 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
                       {item.bitrate}
                     </span>
                   )}
-                  {!hasExoBridge && subtitleTracks.length > 0 && (
+                  {!hasExoBridge && tracks.length > 0 && (
                     <motion.button
                       data-magnetic
                       data-magnetic-id="player-cc"
                       onClick={() => { setShowSubMenu((v) => !v); resetControlsTimer(); }}
                       className="flex items-center justify-center w-11 h-11 rounded-full"
                       style={{
-                        background: selectedSubId ? `${ambientColor}22` : "rgba(22,26,38,0.6)",
+                        background: (selectedSubId || selectedAudioId) ? `${ambientColor}22` : "rgba(22,26,38,0.6)",
                         backdropFilter: "blur(20px)",
-                        border: `1px solid ${selectedSubId ? ambientColor + "66" : "rgba(46,52,71,0.3)"}`,
-                        color: selectedSubId ? "#fff" : "#9aa3b4",
+                        border: `1px solid ${(selectedSubId || selectedAudioId) ? ambientColor + "66" : "rgba(46,52,71,0.3)"}`,
+                        color: (selectedSubId || selectedAudioId) ? "#fff" : "#9aa3b4",
                       }}
                       whileHover={{ scale: 1.08, color: "#e0e6f0" }}
                       whileTap={{ scale: 0.95 }}
@@ -747,29 +829,61 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
                   transition={{ duration: 0.18 }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <p className="px-4 pt-2 pb-2 font-mono-tech text-xs tracking-[0.18em]" style={{ color: "rgba(153,247,255,0.6)" }}>
-                    {t('player.subtitles_caps')}
-                  </p>
-                  {([{ id: null, label: t('player.subtitles_off') }, ...subtitleTracks] as { id: string | null; label: string }[]).map((t) => {
-                    const active = selectedSubId === t.id;
-                    return (
-                      <button
-                        key={t.id ?? "off"}
-                        data-magnetic
-                        data-magnetic-id={`sub-${t.id ?? "off"}`}
-                        onClick={() => selectSubtitle(t.id)}
-                        className="w-full text-left px-4 py-2.5 font-body text-sm flex items-center gap-2"
-                        style={{
-                          background: active ? `${ambientColor}22` : "transparent",
-                          color: active ? "#fff" : "#c3c9d6",
-                          cursor: "none",
-                        }}
-                      >
-                        <span style={{ width: 14, color: ambientColor }}>{active ? "✓" : ""}</span>
-                        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.label}</span>
-                      </button>
-                    );
-                  })}
+                  {tracks.some(t => t.type === "Audio") && (
+                    <>
+                      <p className="px-4 pt-2 pb-2 font-mono-tech text-xs tracking-[0.18em]" style={{ color: "rgba(153,247,255,0.6)" }}>
+                        {t('player.audio_caps', 'AUDIO')}
+                      </p>
+                      {tracks.filter(t => t.type === "Audio").map((trk) => {
+                        const active = selectedAudioId === trk.id;
+                        return (
+                          <button
+                            key={`audio-${trk.id}`}
+                            data-magnetic
+                            data-magnetic-id={`audio-${trk.id}`}
+                            onClick={() => selectTrack("Audio", trk.id)}
+                            className="w-full text-left px-4 py-2.5 font-body text-sm flex items-center gap-2"
+                            style={{
+                              background: active ? `${ambientColor}22` : "transparent",
+                              color: active ? "#fff" : "#c3c9d6",
+                              cursor: "none",
+                            }}
+                          >
+                            <span style={{ width: 14, color: ambientColor }}>{active ? "✓" : ""}</span>
+                            <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{trk.label}</span>
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+
+                  {tracks.some(t => t.type === "Subtitle") && (
+                    <>
+                      <p className="px-4 pt-2 pb-2 font-mono-tech text-xs tracking-[0.18em] mt-2" style={{ color: "rgba(153,247,255,0.6)" }}>
+                        {t('player.subtitles_caps', 'SUBTITLES')}
+                      </p>
+                      {([{ id: null, label: t('player.subtitles_off', 'Off') }, ...tracks.filter(t => t.type === "Subtitle")]).map((trk) => {
+                        const active = selectedSubId === trk.id;
+                        return (
+                          <button
+                            key={`sub-${trk.id ?? "off"}`}
+                            data-magnetic
+                            data-magnetic-id={`sub-${trk.id ?? "off"}`}
+                            onClick={() => selectTrack("Subtitle", trk.id)}
+                            className="w-full text-left px-4 py-2.5 font-body text-sm flex items-center gap-2"
+                            style={{
+                              background: active ? `${ambientColor}22` : "transparent",
+                              color: active ? "#fff" : "#c3c9d6",
+                              cursor: "none",
+                            }}
+                          >
+                            <span style={{ width: 14, color: ambientColor }}>{active ? "✓" : ""}</span>
+                            <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{trk.label}</span>
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>

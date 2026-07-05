@@ -2,17 +2,16 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
 import { useConfigStore } from "../store/useConfigStore";
+import { type PlexServer, plexPinAuthUrl } from "../services/plexApi";
 import {
-  plexSignIn,
-  verifyPlexServer,
-  createPlexPin,
-  pollPlexPin,
-  plexPinAuthUrl,
-  fetchPlexResources,
-  pickPlexConnection,
-  type PlexServer,
-} from "../services/plexApi";
-import { authenticateUser } from "../services/jellyfinApi";
+  usePlexSignIn,
+  usePlexResources,
+  usePlexPinCreate,
+  usePlexPinPoll,
+  usePlexConnection,
+  usePlexVerify
+} from "../hooks/usePlexSetup";
+import { useJellyfinSignIn } from "../hooks/useJellyfinSetup";
 import { Logo } from "./Logo";
 import { useTranslation } from "react-i18next";
 
@@ -54,125 +53,125 @@ export function MediaSetup() {
   const [connecting, setConnecting] = useState<string | null>(null);
   const [manualUrl, setManualUrl] = useState("http://192.168.1.53:32400");
 
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const pollRef = useRef<number | null>(null);
-  const stopPolling = useCallback(() => {
-    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-  }, []);
+  const signInMutation = usePlexSignIn();
+  const pinCreateMutation = usePlexPinCreate();
+  const connectionMutation = usePlexConnection();
+  const verifyMutation = usePlexVerify();
+  const jfSignInMutation = useJellyfinSignIn();
+  const resourcesQuery = usePlexResources(phase === "discovering" ? accountToken : null);
+  const { data: pollToken, isError: pollError } = usePlexPinPoll(pin?.id, phase === "login" && backend === "plex" && mode === "qr");
 
   const save = useCallback((serverUrl: string, token: string, userName?: string) => {
     setPlexConfig({ serverUrl: serverUrl.replace(/\/$/, ""), token, userName });
     setServerType("plex"); // unmounts this screen
   }, [setPlexConfig, setServerType]);
 
-  // A login mode produced an account token → discover the account's servers.
   const onToken = useCallback((tok: string) => {
-    stopPolling();
     setAccountToken(tok);
     setError(null);
     setPhase("discovering");
-  }, [stopPolling]);
+  }, []);
 
   // Discovery
   useEffect(() => {
     if (phase !== "discovering" || !accountToken) return;
-    let cancelled = false;
-    (async () => {
-      const found = await fetchPlexResources(accountToken).catch(() => [] as PlexServer[]);
-      if (cancelled) return;
+    if (resourcesQuery.isSuccess) {
+      const found = resourcesQuery.data;
       setServers(found);
       setPhase(found.length > 0 ? "select" : "manual");
       if (found.length === 0) setError(t('setup.no_servers_found'));
-    })();
-    return () => { cancelled = true; };
-  }, [phase, accountToken]);
+    } else if (resourcesQuery.isError) {
+      setServers([]);
+      setPhase("manual");
+      setError(t('setup.no_servers_found'));
+    }
+  }, [phase, accountToken, resourcesQuery.isSuccess, resourcesQuery.isError, resourcesQuery.data, t]);
 
-  // ── PIN flow ──
-  const startPin = useCallback(async () => {
-    stopPolling();
+  // PIN flow
+  const startPin = useCallback(() => {
     setError(null);
     setPin(null);
-    try {
-      const p = await createPlexPin();
-      setPin({ id: p.id, code: p.code, url: plexPinAuthUrl(p.code) });
-    } catch (e: any) {
-      setError(`${t('setup.plex_tv_unreachable')}: ${e?.message ?? "error"}`);
+    pinCreateMutation.mutate(undefined, {
+      onSuccess: (p) => setPin({ id: p.id, code: p.code, url: plexPinAuthUrl(p.code) }),
+      onError: (e: any) => setError(`${t('setup.plex_tv_unreachable')}: ${e?.message ?? "error"}`)
+    });
+  }, [pinCreateMutation, t]);
+
+  useEffect(() => {
+    if (phase === "login" && backend === "plex" && mode === "qr" && !pin && !pinCreateMutation.isPending) {
+      startPin();
     }
-  }, [stopPolling]);
+  }, [phase, backend, mode, pin, startPin, pinCreateMutation.isPending]);
 
   useEffect(() => {
-    if (phase === "login" && backend === "plex" && mode === "qr" && !pin) startPin();
-  }, [phase, backend, mode, pin, startPin]);
+    if (pollToken) {
+      onToken(pollToken);
+    } else if (pollError) {
+      setError(t('setup.code_expired'));
+      setPin(null);
+    }
+  }, [pollToken, pollError, onToken, t]);
 
-  useEffect(() => {
-    if (phase !== "login" || backend !== "plex" || mode !== "qr" || !pin) return;
-    const deadline = Date.now() + PIN_TIMEOUT_MS;
-    pollRef.current = window.setInterval(async () => {
-      if (Date.now() > deadline) { stopPolling(); setPin(null); setError(t('setup.code_expired')); return; }
-      const tok = await pollPlexPin(pin.id).catch(() => null);
-      if (tok) { stopPolling(); onToken(tok); }
-    }, POLL_MS);
-    return stopPolling;
-  }, [phase, backend, mode, pin, onToken, stopPolling]);
-
-  async function handlePassword() {
+  function handlePassword() {
     if (!username.trim() || !password) { setError(t('setup.username_password_required')); return; }
-    setLoading(true); setError(null);
-    try {
-      const { token } = await plexSignIn(username.trim(), password);
-      onToken(token);
-    } catch (e: any) {
-      setError(e?.message ?? t('setup.login_failed_credentials'));
-    } finally { setLoading(false); }
+    setError(null);
+    signInMutation.mutate({ username: username.trim(), password }, {
+      onSuccess: (res) => onToken(res.token),
+      onError: (e: any) => setError(e?.message ?? t('setup.login_failed_credentials'))
+    });
   }
 
-  async function pickServer(server: PlexServer) {
+  function pickServer(server: PlexServer) {
     setConnecting(server.clientIdentifier);
     setError(null);
-    const uri = await pickPlexConnection(server);
-    setConnecting(null);
-    if (uri) save(uri, server.accessToken, server.name);
-    else setError(t('setup.couldnt_reach_server', { name: server.name }));
+    connectionMutation.mutate(server, {
+      onSuccess: (uri) => {
+        setConnecting(null);
+        if (uri) save(uri, server.accessToken, server.name);
+        else setError(t('setup.couldnt_reach_server', { name: server.name }));
+      },
+      onError: () => {
+        setConnecting(null);
+        setError(t('setup.couldnt_reach_server', { name: server.name }));
+      }
+    });
   }
 
-  async function handleManual() {
+  function handleManual() {
     if (!accountToken) return;
     const url = manualUrl.trim().replace(/\/$/, "");
-    setLoading(true); setError(null);
-    try {
-      await verifyPlexServer(url, accountToken);
-      save(url, accountToken);
-    } catch {
-      setError(t('setup.couldnt_reach_manual'));
-    } finally { setLoading(false); }
+    setError(null);
+    verifyMutation.mutate({ url, token: accountToken }, {
+      onSuccess: () => save(url, accountToken),
+      onError: () => setError(t('setup.couldnt_reach_manual'))
+    });
   }
 
   function switchMode(next: Mode) {
     if (next === mode) return;
-    stopPolling(); setError(null); setPin(null); setMode(next);
+    setError(null); setPin(null); setMode(next);
   }
   function startOver() {
-    stopPolling(); setError(null); setPin(null); setAccountToken(null); setServers([]); setPhase("login");
+    setError(null); setPin(null); setAccountToken(null); setServers([]); setPhase("login");
   }
   function switchBackend(next: Backend) {
     if (next === backend) return;
-    stopPolling(); setError(null); setPin(null); setPhase("login"); setBackend(next);
+    setError(null); setPin(null); setPhase("login"); setBackend(next);
   }
 
-  // Jellyfin connects straight to the entered server (no plex.tv-style discovery).
-  async function handleJellyfin() {
+  function handleJellyfin() {
     const url = jfUrl.trim().replace(/\/$/, "");
     if (!url || !jfUser.trim()) { setError(t('setup.server_address_required')); return; }
-    setLoading(true); setError(null);
-    try {
-      const { token, userId, userName } = await authenticateUser(url, jfUser.trim(), jfPass);
-      setJellyfinConfig({ serverUrl: url, userName, userId, token });
-      setServerType("jellyfin"); // unmounts this screen
-    } catch (e: any) {
-      setError(e?.message ?? t('setup.jellyfin_login_failed'));
-    } finally { setLoading(false); }
+    setError(null);
+    jfSignInMutation.mutate({ url, username: jfUser.trim(), password: jfPass }, {
+      onSuccess: ({ token, userId, userName }) => {
+        setJellyfinConfig({ serverUrl: url, userName, userId, token });
+        setServerType("jellyfin");
+      },
+      onError: (e: any) => setError(e?.message ?? t('setup.jellyfin_login_failed'))
+    });
   }
 
   const subtitle =
@@ -199,6 +198,9 @@ export function MediaSetup() {
             {phase === "login" && (
               <motion.div key="login" initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.2 }}>
                 <div className="flex gap-1.5 mb-5">
+                  <button onClick={() => window.history.back()} className="flex items-center justify-center py-2 px-3 rounded-lg font-display font-semibold text-xs" style={{ background: "transparent", color: "#6b7585", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer" }}>
+                    ←
+                  </button>
                   {(["plex", "jellyfin"] as Backend[]).map((b) => (
                     <button key={b} onClick={() => switchBackend(b)} className="flex-1 py-2 rounded-lg font-display font-semibold text-xs"
                       style={{ background: backend === b ? "rgba(153,247,255,0.12)" : "transparent", color: backend === b ? "#cdeff5" : "#6b7585", border: "1px solid " + (backend === b ? "rgba(153,247,255,0.3)" : "rgba(255,255,255,0.06)"), cursor: "none" }}>
@@ -245,7 +247,7 @@ export function MediaSetup() {
                       className="focusable w-full rounded-xl px-4 py-3.5 font-mono-tech text-sm mb-3 outline-none focus:ring-4 focus:ring-primary/40" style={inputStyle} />
                     <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handlePassword()} placeholder={t('setup.password')}
                       className="focusable w-full rounded-xl px-4 py-3.5 font-mono-tech text-sm mb-5 outline-none focus:ring-4 focus:ring-primary/40" style={inputStyle} />
-                    <PrimaryButton onClick={handlePassword} loading={loading} label={loading ? t('setup.signing_in') : t('setup.sign_in')} />
+                    <PrimaryButton onClick={handlePassword} loading={signInMutation.isPending} label={signInMutation.isPending ? t('setup.signing_in') : t('setup.sign_in')} />
                   </div>
                 )}
 
@@ -267,7 +269,7 @@ export function MediaSetup() {
                       className="focusable w-full rounded-xl px-4 py-3.5 font-mono-tech text-sm mb-3 outline-none focus:ring-4 focus:ring-primary/40" style={inputStyle} />
                     <input type="password" value={jfPass} onChange={(e) => setJfPass(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleJellyfin()} placeholder={t('setup.password')}
                       className="focusable w-full rounded-xl px-4 py-3.5 font-mono-tech text-sm mb-5 outline-none focus:ring-4 focus:ring-primary/40" style={inputStyle} />
-                    <PrimaryButton onClick={handleJellyfin} loading={loading} label={loading ? t('setup.signing_in') : t('setup.sign_in')} />
+                    <PrimaryButton onClick={handleJellyfin} loading={jfSignInMutation.isPending} label={jfSignInMutation.isPending ? t('setup.signing_in') : t('setup.sign_in')} />
                   </div>
                 )}
               </motion.div>
@@ -315,7 +317,7 @@ export function MediaSetup() {
                 <p className="font-body text-sm mb-4" style={{ color: "rgba(224,230,240,0.6)" }}>{t('setup.plex_address_desc')}</p>
                 <input type="url" value={manualUrl} onChange={(e) => setManualUrl(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleManual()} placeholder="http://192.168.1.53:32400" autoFocus
                   className="focusable w-full rounded-xl px-4 py-3.5 font-mono-tech text-sm mb-5 outline-none focus:ring-4 focus:ring-primary/40" style={inputStyle} />
-                <PrimaryButton onClick={handleManual} loading={loading} label={loading ? t('setup.connecting') : t('setup.connect')} />
+                <PrimaryButton onClick={handleManual} loading={verifyMutation.isPending} label={verifyMutation.isPending ? t('setup.connecting') : t('setup.connect')} />
                 <div className="flex justify-between font-body text-xs mt-4" style={{ color: "rgba(224,230,240,0.35)" }}>
                   {servers.length > 0 ? <button onClick={() => setPhase("select")} style={{ cursor: "none" }}>{t('setup.back_to_servers')}</button> : <span />}
                   <button onClick={startOver} style={{ cursor: "none" }}>{t('setup.start_over')}</button>

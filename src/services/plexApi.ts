@@ -132,37 +132,39 @@ export async function fetchPlexShowGuids(
   return (meta?.Guid ?? []).map((g) => g.id).filter(Boolean);
 }
 
-export interface PlexSubtitleTrack {
-  id: string;        // Stream id → subtitleStreamID
+export interface PlexTrack {
+  id: string;        // Stream id → subtitleStreamID / audioStreamID
+  type: "Audio" | "Subtitle";
   label: string;
   language?: string;
 }
 
-/** Subtitle streams for an item, so the desktop player can offer a CC menu. The webview can't
- *  toggle a burned-in track itself, so we burn the chosen one server-side (see applyPlexSubtitle). */
-export async function fetchPlexSubtitleTracks(cfg: PlexConfig, ratingKey: string): Promise<PlexSubtitleTrack[]> {
+/** Subtitle/Audio streams for an item. The webview can't toggle burned-in tracks itself,
+ *  so we burn/mux the chosen one server-side (see applyPlexTracks). */
+export async function fetchPlexTracks(cfg: PlexConfig, ratingKey: string): Promise<PlexTrack[]> {
   const base = cfg.serverUrl.replace(/\/$/, "");
   const data = await plexFetch(`${base}/library/metadata/${ratingKey}`, cfg.token).catch(() => ({}));
   const meta = (data.MediaContainer?.Metadata ?? [])[0];
   const streams: any[] = meta?.Media?.[0]?.Part?.[0]?.Stream ?? [];
   return streams
-    .filter((s) => s.streamType === 3) // 3 = subtitle
+    .filter((s) => s.streamType === 2 || s.streamType === 3) // 2 = audio, 3 = subtitle
     .map((s) => ({
       id: String(s.id),
-      label: s.extendedDisplayTitle || s.displayTitle || s.title || s.language || `Subtitle ${s.id}`,
+      type: s.streamType === 2 ? "Audio" : "Subtitle",
+      label: s.extendedDisplayTitle || s.displayTitle || s.title || s.language || `${s.streamType === 2 ? "Audio" : "Subtitle"} ${s.id}`,
       language: s.language,
     }));
 }
 
 /**
- * Rebuilds a Plex transcode URL to burn in [subtitleStreamId] (or remove subtitles when null),
- * keeping the audio params already on the URL. A fresh session + a primed `/decision` call are
- * required for PMS to honour the subtitle change on start.m3u8 (same as the Android path).
+ * Rebuilds a Plex transcode URL to burn in [subtitleStreamId] and/or select [audioStreamId].
+ * A fresh session + a primed `/decision` call are required for PMS to honour the change on start.m3u8.
  */
-export async function applyPlexSubtitle(
+export async function applyPlexTracks(
   currentUrl: string,
   cfg: PlexConfig,
   subtitleStreamId: string | null,
+  audioStreamId: string | null,
 ): Promise<string> {
   if (!currentUrl.includes("/transcode/universal/")) return currentUrl;
   let u: URL;
@@ -177,8 +179,15 @@ export async function applyPlexSubtitle(
     u.searchParams.delete("subtitles");
     u.searchParams.delete("subtitleSize");
   }
+
+  if (audioStreamId) {
+    u.searchParams.set("audioStreamID", audioStreamId);
+  } else {
+    u.searchParams.delete("audioStreamID");
+  }
+
   // Fresh session so PMS starts a new transcode honouring the change.
-  const session = `butu-sub-${Date.now()}`;
+  const session = `butu-trk-${Date.now()}`;
   u.searchParams.set("session", session);
   u.searchParams.set("X-Plex-Session-Identifier", session);
 

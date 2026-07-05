@@ -24,9 +24,10 @@ interface MediaStageProps {
   onSelect: (item: MediaItem) => void;
   featured?: boolean;
   metaLabel?: string;
+  forceAspect?: "wide" | "poster";
 }
 
-export function MediaStage({ title, items, onSelect, featured = false, metaLabel }: MediaStageProps) {
+export function MediaStage({ title, items, onSelect, featured = false, metaLabel, forceAspect }: MediaStageProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scroll = (direction: "left" | "right") => {
@@ -125,6 +126,7 @@ export function MediaStage({ title, items, onSelect, featured = false, metaLabel
             <MediaCard
               item={item}
               size="standard"
+              forceAspect={forceAspect}
               onSelect={onSelect}
             />
           </CardWrapper>
