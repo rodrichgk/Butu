@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, useMemo, type ReactNode, type CSSProperties } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, type ReactNode, type CSSProperties } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import { LiquidCursor } from "./components/LiquidCursor";
@@ -9,19 +9,22 @@ import { MobileNav, MOBILE_NAV_HEIGHT } from "./components/MobileNav";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { MobileTopBar } from "./components/MobileTopBar";
 import { useTouchLayout } from "./hooks/useIsMobile";
-import { ButuPlayer } from "./components/ButuPlayer";
-import { ContentDetailPage } from "./components/ContentDetailPage";
-import { MediaSetup } from "./components/MediaSetup";
-import { Landing } from "./components/Landing";
+const ButuPlayer = lazy(() => import("./components/ButuPlayer").then(m => ({ default: m.ButuPlayer })));
+const ContentDetailPage = lazy(() => import("./components/ContentDetailPage").then(m => ({ default: m.ContentDetailPage })));
+const MediaSetup = lazy(() => import("./components/MediaSetup").then(m => ({ default: m.MediaSetup })));
+const Landing = lazy(() => import("./components/Landing").then(m => ({ default: m.Landing })));
 import { SplashScreen } from "./components/SplashScreen";
-import { MarkerAutoDetectModal } from "./components/MarkerAutoDetectModal";
-import { OrganizeModal } from "./components/OrganizeModal";
+
 import { usePlatformBridge, PlatformContext } from "./hooks/usePlatformBridge";
 import { QRCodeSVG } from "qrcode.react";
 import { useSpatialCursor } from "./hooks/useSpatialCursor";
 import { useSpatialNavigation } from "./hooks/useSpatialNavigation";
 import { useTouchpadScroll } from "./hooks/useTouchpadScroll";
-import { useButuStore } from "./store/useButuStore";
+import { useConfigStore } from "./store/useConfigStore";
+import { useLibraryStore } from "./store/useLibraryStore";
+import { Routes, Route, useLocation, useNavigate, Navigate, useSearchParams } from "react-router-dom";
+import { useLibraryQuery } from "./hooks/useLibraryQuery";
+import { tauriListen, isTauri } from "./services/tauri";
 import {
   fetchJellyfinLibrary,
   fetchJellyfinEpisodes,
@@ -36,12 +39,19 @@ import {
   plexRawToEpisode
 } from "./services/plexApi";
 import type { MediaItem, WatchProgressEntry } from "./types";
-import { isAndroid } from "./utils/platform";
+import { PlatformContext as _PlatformContext, getPlatform } from "./utils/platform";
+import { getActiveSection, getLocalizedPath } from "./utils/routeHelpers";
 import { describeServerError } from "./utils/errorMessages";
 import { preloader } from "./utils/predictivePreloader";
 import { swManager } from "./utils/serviceWorkerManager";
 import { metadataCache } from "./utils/metadataCache";
 import { resourcePrioritizer } from "./utils/resourcePrioritizer";
+import { HomeStatus } from "./components/HomeStatus";
+import { ConnectionErrorBanner } from "./components/ConnectionErrorBanner";
+
+const BrowseView = lazy(() => import("./components/views/BrowseView"));
+const SearchView = lazy(() => import("./components/views/SearchView"));
+const SettingsView = lazy(() => import("./components/views/SettingsView"));
 
 /**
  * Rewrites the audio params on a Plex universal-transcode URL according to the
@@ -73,58 +83,13 @@ function applyAudioPrefs(item: MediaItem, boostVoices: boolean): MediaItem {
   return { ...item, streamUrl, url };
 }
 
-// Donation link (PayPal). The Support section + QR appear everywhere once this is a real URL;
-// it auto-hides while it's the example.com placeholder so we can ship without one.
-const DONATE_URL = "https://www.paypal.com/donate/?hosted_button_id=7YJ9V2CMFRRPW";
-const DONATE_ENABLED = !DONATE_URL.includes("example.com");
 
-function openExternal(url: string) {
-  window.open(url, "_blank", "noopener,noreferrer");
-}
 
-function DonateModal({ onClose }: { onClose: () => void }) {
-  return (
-    <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(4,6,13,0.8)", backdropFilter: "blur(8px)" }}
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      onClick={onClose}
-    >
-      <motion.div
-        className="rounded-3xl p-8 flex flex-col items-center"
-        style={{ background: "rgba(16,20,30,0.98)", border: "1px solid rgba(153,247,255,0.15)", maxWidth: 360 }}
-        initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 10 }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="font-display font-bold text-on_surface text-xl mb-1">Support Butu</h2>
-        <p className="font-body text-on_surface_variant text-sm text-center mb-5">
-          Butu is free. Scan with your phone — or open the page — to support development ❤
-        </p>
-        <div className="p-3 rounded-2xl" style={{ background: "#fff" }}>
-          <QRCodeSVG value={DONATE_URL} size={200} bgColor="#ffffff" fgColor="#04060d" />
-        </div>
-        <motion.button
-          onClick={() => openExternal(DONATE_URL)}
-          className="mt-5 px-5 py-2.5 rounded-xl font-body text-sm font-semibold"
-          style={{ background: "rgba(153,247,255,0.12)", color: "#99f7ff", border: "1px solid rgba(153,247,255,0.3)", cursor: "none" }}
-          whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-        >
-          Open donation page
-        </motion.button>
-        <button onClick={onClose} className="mt-3 font-body text-sm" style={{ color: "rgba(224,230,240,0.5)", cursor: "none" }}>
-          Close
-        </button>
-      </motion.div>
-    </motion.div>
-  );
-}
-
-function useFilteredLibrary() {
-  const activeSection  = useButuStore((s) => s.activeSection);
-  const storeLibrary   = useButuStore((s) => s.library);
-  const jellyfinConfig = useButuStore((s) => s.jellyfinConfig);
-  const plexConfig     = useButuStore((s) => s.plexConfig);
-  const watchProgress  = useButuStore((s) => s.watchProgress);
+function useFilteredLibrary(activeSection: string, storeLibrary: MediaItem[]) {
+    
+  const plexConfig     = useConfigStore((s) => s.plexConfig);
+  const jellyfinConfig = useConfigStore((s) => s.jellyfinConfig);
+  const watchProgress  = useLibraryStore((s) => s.watchProgress);
 
   return useMemo(() => {
     const source = storeLibrary;
@@ -166,28 +131,69 @@ function useFilteredLibrary() {
 
 export default function App() {
   const { t } = useTranslation();
+
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { platform } = usePlatformBridge();
+  const activeSection = getActiveSection(location.pathname);
+  const isTouchLayout = useTouchLayout();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const detailId = searchParams.get("detail");
+  const playId = searchParams.get("play");
+
+  const { data: queryLibrary = [] } = useLibraryQuery();
+
+  const selectedMedia = useMemo(() => {
+    return detailId ? queryLibrary.find(m => m.id === detailId) || null : null;
+  }, [detailId, queryLibrary]);
+
+  const playerMediaRaw = useMemo(() => {
+    return playId ? queryLibrary.find(m => m.id === playId) || null : null;
+  }, [playId, queryLibrary]);
+  const boostVoices = useConfigStore((s) => s.settings.boostVoices);
+  const playerMedia = useMemo(() => playerMediaRaw ? applyAudioPrefs(playerMediaRaw, boostVoices) : null, [playerMediaRaw, boostVoices]);
+
+  const setSelectedMedia = useCallback((media: MediaItem | null) => {
+    setSearchParams((prev) => {
+      if (media) prev.set("detail", media.id);
+      else prev.delete("detail");
+      return prev;
+    });
+  }, [setSearchParams]);
   const [showSplash, setShowSplash] = useState(true);
-  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
-  const [playerMedia,   setPlayerMedia]   = useState<MediaItem | null>(null);
+  const plexConfig       = useConfigStore((s) => s.plexConfig);
+  const jellyfinConfig   = useConfigStore((s) => s.jellyfinConfig);
+  
+  useEffect(() => {
+    const hosts: string[] = [];
+    if (plexConfig?.serverUrl) hosts.push(plexConfig.serverUrl);
+    if (jellyfinConfig?.serverUrl) hosts.push(jellyfinConfig.serverUrl);
+    if (hosts.length > 0 && isTauri()) {
+      import("./services/tauri").then(({ invoke }) => {
+        invoke("set_allowed_hosts", { hosts }).catch(console.error);
+      });
+    }
+  }, [plexConfig, jellyfinConfig]);
+
   const [playerInitialTime, setPlayerInitialTime] = useState<number>(0);
   const [playerPlaylist, setPlayerPlaylist] = useState<MediaItem[]>([]);
   const [showExitDialog, setShowExitDialog] = useState(false);
   const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const prevSelectedMedia = useRef<MediaItem | null>(null);
-  const setWatchProgress = useButuStore((s) => s.setWatchProgress);
-  const settings         = useButuStore((s) => s.settings);
-  const libraryRefreshKey = useButuStore((s) => s.libraryRefreshKey);
+    const setWatchProgress = useLibraryStore((s) => s.setWatchProgress);
+  const settings         = useConfigStore((s) => s.settings);
+  
 
   const handlePlay = useCallback(
     (item: MediaItem, initialTime?: number, playlist?: MediaItem[]) => {
-      prevSelectedMedia.current = selectedMedia;
-      const boostVoices = useButuStore.getState().settings.boostVoices;
       setPlayerInitialTime(initialTime ?? 0);
       setPlayerPlaylist(playlist ?? []);
-      setPlayerMedia(applyAudioPrefs(item, boostVoices));
-      setSelectedMedia(null);
+      setSearchParams((prev) => {
+        prev.delete("detail");
+        prev.set("play", item.id);
+        return prev;
+      });
     },
-    [selectedMedia]
+    [setSearchParams]
   );
 
   // Persist where we are in the current item. Keyed by the playing item's id
@@ -220,14 +226,18 @@ export default function App() {
   const handleClosePlayer = useCallback(
     (progress?: { time: number; duration?: number; season?: number; episode?: number }) => {
       if (progress && playerMedia) saveProgress(playerMedia, progress.time, progress.duration);
-      setPlayerMedia(null);
       setPlayerPlaylist([]);
-      if (prevSelectedMedia.current) {
-        setSelectedMedia(prevSelectedMedia.current);
-        prevSelectedMedia.current = null;
+      // Native navigation pop restores the detail view automatically
+      if (window.history.length > 1) {
+        navigate(-1);
+      } else {
+        setSearchParams((prev) => {
+          prev.delete("play");
+          return prev;
+        }, { replace: true });
       }
     },
-    [playerMedia, saveProgress]
+    [playerMedia, saveProgress, navigate, setSearchParams]
   );
 
   // Episode finished playing → mark it watched, then auto-advance to the next
@@ -243,32 +253,34 @@ export default function App() {
         const next = idx >= 0 ? playerPlaylist[idx + 1] : undefined;
         if (next && settings.autoPlayNext) {
           setPlayerInitialTime(0);
-          setPlayerMedia(next);
+          setSearchParams((prev) => {
+            prev.set("play", next.id);
+            return prev;
+          }, { replace: true });
           return;
         }
       }
-      setPlayerMedia(null);
       setPlayerPlaylist([]);
-      if (prevSelectedMedia.current) {
-        setSelectedMedia(prevSelectedMedia.current);
-        prevSelectedMedia.current = null;
+      if (window.history.length > 1) {
+        navigate(-1);
+      } else {
+        setSearchParams((prev) => {
+          prev.delete("play");
+          return prev;
+        }, { replace: true });
       }
     },
-    [playerMedia, playerPlaylist, saveProgress, settings.autoPlayNext]
+    [playerMedia, playerPlaylist, saveProgress, settings.autoPlayNext, navigate, setSearchParams]
   );
-  const activeSection    = useButuStore((s) => s.activeSection);
-  const setActiveSection = useButuStore((s) => s.setActiveSection);
-  const isTouchLayout    = useTouchLayout();
-  const serverType       = useButuStore((s) => s.serverType);
-  const jellyfinConfig   = useButuStore((s) => s.jellyfinConfig);
-  const plexConfig       = useButuStore((s) => s.plexConfig);
-  const setLibrary       = useButuStore((s) => s.setLibrary);
+  const setActiveSection = useCallback((val: string) => navigate(getLocalizedPath(val === "home" ? "/" : `/${val}`, location.pathname.split("/").filter(Boolean)[0] === "fr" ? "fr" : "en")), [navigate, location.pathname]);
+  const serverType       = useConfigStore((s) => s.serverType);
+  
   // Landing → setup gate. Show the explainer first; once connected (or on a later disconnect)
   // it resets so a signed-out visitor always lands on the explainer, not straight on the form.
   const [showSetup, setShowSetup] = useState(false);
   useEffect(() => { if (serverType) setShowSetup(false); }, [serverType]);
-  const setJellyfinLoading = useButuStore((s) => s.setJellyfinLoading);
-  const setJellyfinError   = useButuStore((s) => s.setJellyfinError);
+  
+  
 
   useSpatialNavigation();
   useTouchpadScroll();
@@ -293,89 +305,33 @@ export default function App() {
     return () => clearTimeout(t);
   }, []);
 
-  useEffect(() => {
-    history.pushState({ butu: true }, "");
-  }, []);
-
-  useEffect(() => {
-    const handleBack = (e: PopStateEvent) => {
-      history.pushState({ butu: true }, "");
-
-      if (playerMedia) {
-        // Use handleClosePlayer so we restore the previously-open detail page
-        handleClosePlayer();
-        return;
-      }
-      if (selectedMedia) {
-        setSelectedMedia(null);
-        return;
-      }
-      if (activeSection !== "home") {
-        setActiveSection(isTouchLayout && CATEGORY_IDS.includes(activeSection) ? "browse" : "home");
-        return;
-      }
-      setShowExitDialog(true);
-      if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
-      exitTimerRef.current = setTimeout(() => setShowExitDialog(false), 4000);
-    };
-
-    window.addEventListener("popstate", handleBack);
-    return () => window.removeEventListener("popstate", handleBack);
-  }, [playerMedia, selectedMedia, activeSection, setActiveSection, handleClosePlayer, isTouchLayout]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" || e.key === "GoBack" || e.key === "BrowserBack") {
-        e.preventDefault();
-        if (playerMedia) { handleClosePlayer(); return; }
-        if (selectedMedia) { setSelectedMedia(null); return; }
-        if (activeSection !== "home") { setActiveSection(isTouchLayout && CATEGORY_IDS.includes(activeSection) ? "browse" : "home"); return; }
-        setShowExitDialog(true);
-        if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
-        exitTimerRef.current = setTimeout(() => setShowExitDialog(false), 4000);
+        if (e.key === "Escape") {
+          e.preventDefault(); // Only prevent default for Escape. Let GoBack and BrowserBack do their native popstate!
+        }
+        
+        // If Escape is pressed, we manually trigger the exact same actions as a back button
+        if (e.key === "Escape") {
+          if (playerMedia) { handleClosePlayer(); return; }
+          if (selectedMedia) { 
+             setSearchParams((prev) => { prev.delete("detail"); return prev; }); 
+             return; 
+          }
+          if (activeSection !== "home") { setActiveSection(isTouchLayout && CATEGORY_IDS.includes(activeSection) ? "browse" : "home"); return; }
+          setShowExitDialog(true);
+          if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
+          exitTimerRef.current = setTimeout(() => setShowExitDialog(false), 4000);
+        }
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
   }, [playerMedia, selectedMedia, activeSection, setActiveSection, handleClosePlayer, isTouchLayout]);
 
-  useEffect(() => {
-    if (!serverType) return;
-    if (serverType === "jellyfin" && !jellyfinConfig) return;
-    if (serverType === "plex" && !plexConfig) return;
-
-    let cancelled = false;
-
-    async function loadLibrary() {
-      setJellyfinLoading(true);
-      setJellyfinError(null);
-      try {
-        if (serverType === "jellyfin") {
-          const rawItems = await fetchJellyfinLibrary(jellyfinConfig!);
-          const mediaItems = rawItems.map((r) => rawToMediaItem(r, jellyfinConfig!));
-          if (!cancelled) setLibrary(mediaItems);
-        } else if (serverType === "plex") {
-          const sections = await fetchPlexSections(plexConfig!);
-          const allMedia: MediaItem[] = [];
-          for (const s of sections) {
-            if (s.type === "movie" || s.type === "show") {
-              const rawItems = await fetchPlexSection(plexConfig!, s.key);
-              for (const raw of rawItems) {
-                allMedia.push(plexRawToMediaItem(raw, plexConfig!));
-              }
-            }
-          }
-          if (!cancelled) setLibrary(allMedia);
-        }
-      } catch (e) {
-        if (!cancelled) setJellyfinError(describeServerError(e, serverType));
-      } finally {
-        if (!cancelled) setJellyfinLoading(false);
-      }
-    }
-    loadLibrary();
-    return () => { cancelled = true; };
-  }, [serverType, jellyfinConfig, plexConfig, libraryRefreshKey, setLibrary, setJellyfinLoading, setJellyfinError]);
+  
 
   const { updateFromIMU } = useSpatialCursor();
 
@@ -409,25 +365,26 @@ export default function App() {
   }, [selectedMedia, playerMedia]);
 
   useEffect(() => {
-    const handleScroll = (e: Event) => {
-      const dir = (e as CustomEvent<{ direction: number }>).detail?.direction ?? 0;
+    let unlisten: (() => void) | undefined;
+    tauriListen<{ direction: number }>("spatial-scroll", (e) => {
+      const dir = e.direction;
       mainRef.current?.scrollBy({ top: dir * 300, behavior: "smooth" });
-    };
-    window.addEventListener("spatial-scroll", handleScroll);
-    return () => window.removeEventListener("spatial-scroll", handleScroll);
+    }).then((f) => { unlisten = f; });
+    return () => unlisten?.();
   }, []);
 
   useEffect(() => {
+    let unlisten: (() => void) | undefined;
     const handleBack = () => {
       if (playerMedia) { handleClosePlayer(); return; }
       if (selectedMedia) { setSelectedMedia(null); return; }
       if (activeSection !== "home") { setActiveSection(isTouchLayout && CATEGORY_IDS.includes(activeSection) ? "browse" : "home"); return; }
     };
-    window.addEventListener("spatial-back", handleBack);
-    return () => window.removeEventListener("spatial-back", handleBack);
+    tauriListen("spatial-back", handleBack).then((f) => { unlisten = f; });
+    return () => unlisten?.();
   }, [playerMedia, selectedMedia, activeSection, setActiveSection, handleClosePlayer, isTouchLayout]);
 
-  const { movies, music, tv, anime, manga, source, continueWatching, featured } = useFilteredLibrary();
+  const { movies, music, tv, anime, manga, source, continueWatching, featured } = useFilteredLibrary(activeSection, queryLibrary);
 
   const handleItemSelect = useCallback(
     (item: MediaItem) => {
@@ -450,7 +407,11 @@ export default function App() {
     // Plex/Jellyfin login. Once a server is connected the app goes straight to the content.
     // Both are form/marketing screens — they use the real OS cursor (see index.css), so no
     // liquid cursor here (it depends on the magnetic-snap system these screens don't wire up).
-    return showSetup ? <MediaSetup /> : <Landing onGetStarted={() => setShowSetup(true)} />;
+    return (
+      <Suspense fallback={null}>
+        {showSetup ? <MediaSetup /> : <Landing onGetStarted={() => setShowSetup(true)} />}
+      </Suspense>
+    );
   }
 
   return (
@@ -611,15 +572,21 @@ export default function App() {
           )}
 
           {activeSection === "browse" && (
-            <BrowseView />
+            <Suspense fallback={null}>
+              <BrowseView />
+            </Suspense>
           )}
 
           {activeSection === "search" && (
-            <SearchView onSelect={handleItemSelect} />
+            <Suspense fallback={null}>
+              <SearchView onSelect={handleItemSelect} />
+            </Suspense>
           )}
 
           {activeSection === "settings" && (
-            <SettingsView />
+            <Suspense fallback={null}>
+              <SettingsView />
+            </Suspense>
           )}
 
           {activeSection === "home" && source.length === 0 && (
@@ -631,25 +598,27 @@ export default function App() {
 
       <AnimatePresence>
         {selectedMedia && (
-          <ContentDetailPage
-            key={`detail-${selectedMedia.id}`}
-            item={selectedMedia}
-            onPlay={handlePlay}
-            onClose={() => setSelectedMedia(null)}
-          />
+          <Suspense fallback={null} key={`detail-${selectedMedia.id}`}>
+            <ContentDetailPage
+              item={selectedMedia}
+              onPlay={handlePlay}
+              onClose={() => setSelectedMedia(null)}
+            />
+          </Suspense>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {playerMedia && (
-          <ButuPlayer
-            key={playerMedia.id}
-            item={playerMedia}
-            initialTime={playerInitialTime}
-            onClose={handleClosePlayer}
-            onProgress={handlePlayerProgress}
-            onEnded={handlePlayerEnded}
-          />
+          <Suspense fallback={null} key={playerMedia.id}>
+            <ButuPlayer
+              item={playerMedia}
+              initialTime={playerInitialTime}
+              onClose={handleClosePlayer}
+              onProgress={handlePlayerProgress}
+              onEnded={handlePlayerEnded}
+            />
+          </Suspense>
         )}
       </AnimatePresence>
 
@@ -701,7 +670,18 @@ export default function App() {
                 STAY
               </button>
               <button
-                onClick={() => { window.history.go(-100); }}
+                onClick={async () => {
+                  if (platform === PlatformContext.DesktopTauri) {
+                    try {
+                      const { getCurrentWindow } = await import("@tauri-apps/api/window");
+                      await getCurrentWindow().close();
+                    } catch (e) {
+                      window.close();
+                    }
+                  } else {
+                    window.history.go(-100);
+                  }
+                }}
                 style={{
                   flex: 1, padding: "0.6rem", borderRadius: "0.75rem",
                   background: "rgba(255, 80, 80, 0.1)",
@@ -726,533 +706,4 @@ export default function App() {
   );
 }
 
-function HomeStatus() {
-  const loading = useButuStore((s) => s.jellyfinLoading);
-  const error   = useButuStore((s) => s.jellyfinError);
-  const refresh = useButuStore((s) => s.refreshLibrary);
-  const setActiveSection = useButuStore((s) => s.setActiveSection);
-  return (
-    <div className="px-4 sm:px-8 lg:px-20 py-24 flex flex-col items-center text-center gap-3">
-      {loading ? (
-        <p className="font-mono-tech text-on_surface_variant text-sm animate-pulse">
-          Loading your library…
-        </p>
-      ) : error ? (
-        <>
-          <div style={{ fontSize: 30, lineHeight: 1 }}>⚠️</div>
-          <p className="font-display font-semibold" style={{ fontSize: 17, color: "#ff8c8c" }}>
-            Couldn't load your library
-          </p>
-          <p className="font-body text-on_surface_variant text-sm" style={{ maxWidth: 440, lineHeight: 1.55 }}>
-            {error}
-          </p>
-          <div className="flex items-center gap-2 mt-2">
-            <button onClick={() => refresh()} className="focusable" style={errorBtnPrimary}>Retry</button>
-            <button onClick={() => setActiveSection("settings")} className="focusable" style={errorBtnGhost}>Settings</button>
-          </div>
-        </>
-      ) : (
-        <>
-          <p className="font-display font-semibold text-on_surface" style={{ fontSize: 18 }}>
-            No media found
-          </p>
-          <p className="font-body text-on_surface_variant text-sm">
-            Your server's libraries look empty, or are still scanning.
-          </p>
-        </>
-      )}
-    </div>
-  );
-}
 
-const errorBtnPrimary: CSSProperties = {
-  padding: "8px 18px", borderRadius: 12, fontSize: 13, fontWeight: 600,
-  background: "rgba(153,247,255,0.14)", color: "#99f7ff",
-  border: "1px solid rgba(153,247,255,0.32)",
-};
-const errorBtnGhost: CSSProperties = {
-  padding: "8px 16px", borderRadius: 12, fontSize: 13, fontWeight: 600,
-  background: "rgba(255,255,255,0.04)", color: "rgba(224,230,240,0.7)",
-  border: "1px solid rgba(255,255,255,0.10)",
-};
-
-/**
- * Top-of-content banner shown when a library refresh fails *while content is
- * already on screen* (stale data) — the empty-library case is covered by
- * HomeStatus. Either way the user sees the problem without opening the console.
- */
-function ConnectionErrorBanner() {
-  const error   = useButuStore((s) => s.jellyfinError);
-  const loading = useButuStore((s) => s.jellyfinLoading);
-  const hasData = useButuStore((s) => s.library.length > 0);
-  const refresh = useButuStore((s) => s.refreshLibrary);
-  const [dismissed, setDismissed] = useState(false);
-  // A new/changed error re-shows the banner even if previously dismissed.
-  useEffect(() => { setDismissed(false); }, [error]);
-
-  if (!error || loading || dismissed || !hasData) return null;
-  return (
-    <div
-      role="alert"
-      className="mx-4 sm:mx-8 lg:mx-20 mt-4 mb-2 flex items-start gap-3 rounded-2xl p-4"
-      style={{ background: "rgba(255,90,90,0.10)", border: "1px solid rgba(255,90,90,0.30)" }}
-    >
-      <span style={{ fontSize: 18, lineHeight: 1.2 }}>⚠️</span>
-      <div className="flex-1 min-w-0">
-        <p className="font-display font-semibold" style={{ color: "#ff8c8c", fontSize: 14 }}>
-          Connection problem — showing what loaded earlier
-        </p>
-        <p className="font-body text-on_surface_variant" style={{ fontSize: 13, lineHeight: 1.5, marginTop: 2 }}>
-          {error}
-        </p>
-      </div>
-      <div className="flex items-center gap-2 flex-shrink-0">
-        <button onClick={() => refresh()} className="focusable" style={errorBtnPrimary}>Retry</button>
-        <button onClick={() => setDismissed(true)} className="focusable" aria-label="Dismiss"
-          style={{ ...errorBtnGhost, padding: "8px 12px" }}>✕</button>
-      </div>
-    </div>
-  );
-}
-
-// Maps a Browse category id to the MediaItem.type it groups.
-const BROWSE_TYPE: Record<string, string> = {
-  movies: "movie", tv: "tv", anime: "anime", manga: "manga", music: "music",
-};
-
-// Browse is a real destination (Apple Music "Library" pattern): a grid of the
-// content categories you drill into — never a tab that opens a sheet.
-function BrowseView() {
-  const { t } = useTranslation();
-  const setActiveSection = useButuStore((s) => s.setActiveSection);
-  const library          = useButuStore((s) => s.library);
-
-  const countFor = (id: string) => library.filter((i) => i.type === BROWSE_TYPE[id]).length;
-  // Don't surface empty categories as dead-ends — but if nothing has loaded yet,
-  // fall back to showing all so the page is never blank.
-  const nonEmpty = CATEGORY_ITEMS.filter((c) => countFor(c.id) > 0);
-  const shown = nonEmpty.length ? nonEmpty : CATEGORY_ITEMS;
-
-  return (
-    <div className="px-4 sm:px-8 lg:px-20 pt-10">
-      <h1 className="font-display font-black text-on_surface mb-8" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
-        {t("nav.browse")}
-      </h1>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4" style={{ maxWidth: 900 }}>
-        {shown.map((item) => {
-          const count = countFor(item.id);
-          const Icon  = item.icon;
-          return (
-            <motion.button
-              key={item.id}
-              onClick={() => setActiveSection(item.id)}
-              className="focusable text-left rounded-2xl p-5 flex flex-col gap-4"
-              data-magnetic
-              data-magnetic-id={`browse-${item.id}`}
-              style={{ background: "rgba(22,26,38,0.7)", border: "1px solid rgba(46,52,71,0.3)", cursor: "none" }}
-              whileHover={{ background: "rgba(30,35,48,0.9)", borderColor: "rgba(153,247,255,0.18)", scale: 1.02 }}
-              whileFocus={{ background: "rgba(30,35,48,0.9)", borderColor: "rgba(153,247,255,0.18)", scale: 1.03 }}
-              whileTap={{ scale: 0.98 }}
-              transition={{ duration: 0.2 }}
-            >
-              <span style={{
-                width: 48, height: 48, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center",
-                color: "#99f7ff", background: "rgba(153,247,255,0.08)", border: "1px solid rgba(153,247,255,0.16)",
-              }}>
-                <Icon />
-              </span>
-              <div>
-                <p className="font-display font-bold text-on_surface" style={{ fontSize: "1.05rem" }}>{t(item.i18nKey)}</p>
-                <p className="font-mono-tech text-on_surface_variant text-xs mt-0.5">
-                  {count} {count === 1 ? "TITLE" : "TITLES"}
-                </p>
-              </div>
-            </motion.button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function SearchView({ onSelect }: { onSelect: (item: MediaItem) => void }) {
-  const [query, setQuery]    = useState("");
-  const source               = useButuStore((s) => s.library);
-  const results = query.length > 1
-    ? source.filter((i) =>
-        i.title.toLowerCase().includes(query.toLowerCase()) ||
-        i.artist?.toLowerCase().includes(query.toLowerCase()) ||
-        i.genre?.some((g) => g.toLowerCase().includes(query.toLowerCase()))
-      )
-    : [];
-
-  return (
-    <div className="px-4 sm:px-8 lg:px-20 pt-10">
-      <h1 className="font-display font-black text-on_surface mb-8" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
-        Search
-      </h1>
-      <div
-        className="relative mb-10"
-        style={{ maxWidth: 640 }}
-      >
-        <svg
-          className="absolute left-5 top-1/2 -translate-y-1/2"
-          width="20" height="20" viewBox="0 0 24 24"
-          fill="none" stroke="#9aa3b4" strokeWidth="2"
-        >
-          <circle cx="11" cy="11" r="8" />
-          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search titles, artists, genres…"
-          className="w-full pl-14 pr-6 py-4 rounded-xl font-body text-on_surface placeholder-on_surface_variant text-lg"
-          style={{
-            background: "rgba(22,26,38,0.8)",
-            border: "1px solid rgba(46,52,71,0.4)",
-            
-            cursor: "none",
-            caretColor: "#99f7ff",
-          }}
-          autoFocus
-        />
-      </div>
-
-      {results.length > 0 && (
-        <MediaStage title={`Results for "${query}"`} items={results} onSelect={onSelect} />
-      )}
-
-      {query.length > 1 && results.length === 0 && (
-        <div className="text-center py-16">
-          <p className="font-display font-bold text-on_surface_variant text-xl">No results found</p>
-          <p className="font-body text-on_surface_variant text-sm mt-2">Try a different search term</p>
-        </div>
-      )}
-
-      {query.length === 0 && (
-        <div>
-          <p className="font-mono-tech text-on_surface_variant text-xs mb-6">BROWSE BY GENRE</p>
-          <div className="flex flex-wrap gap-3">
-            {["Action", "Drama", "Sci-Fi", "Thriller", "Electronic", "R&B", "Hip-Hop", "Post-Apocalyptic"].map((genre) => (
-              <button
-                key={genre}
-                data-magnetic
-                data-magnetic-id={`genre-${genre}`}
-                onClick={() => setQuery(genre)}
-                className="px-5 py-2.5 rounded-full font-body text-sm"
-                style={{
-                  background: "rgba(28,52,55,0.6)",
-                  color: "#b2ccd0",
-                  border: "1px solid rgba(46,52,71,0.3)",
-                  cursor: "none",
-                }}
-              >
-                {genre}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SettingSection({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div className="mb-7 max-w-2xl">
-      <p className="font-mono-tech text-xs tracking-[0.22em] mb-3" style={{ color: "rgba(153,247,255,0.55)" }}>{title}</p>
-      <div className="grid gap-3">{children}</div>
-    </div>
-  );
-}
-
-function ToggleRow({ label, sub, value, onChange }: { label: string; sub: string; value: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <div
-      data-magnetic
-      data-magnetic-id={`toggle-${label}`}
-      onClick={() => onChange(!value)}
-      className="flex items-center justify-between p-5 rounded-xl"
-      style={{ background: "rgba(22,26,38,0.7)", border: "1px solid rgba(46,52,71,0.3)", cursor: "pointer" }}
-    >
-      <div className="pr-4">
-        <p className="font-display font-semibold text-on_surface text-base">{label}</p>
-        <p className="font-body text-on_surface_variant text-sm mt-0.5">{sub}</p>
-      </div>
-      <div
-        className="relative flex-shrink-0"
-        style={{
-          width: 46, height: 26, borderRadius: 999,
-          background: value ? "linear-gradient(135deg,#99f7ff,#00f1fe)" : "rgba(255,255,255,0.08)",
-          border: "1px solid " + (value ? "rgba(153,247,255,0.4)" : "rgba(255,255,255,0.1)"),
-          transition: "background 0.2s",
-        }}
-      >
-        <motion.span
-          animate={{ x: value ? 22 : 2 }}
-          transition={{ type: "spring", stiffness: 500, damping: 32 }}
-          style={{ position: "absolute", top: 2, width: 20, height: 20, borderRadius: "50%", background: value ? "#001f24" : "#9aa3b4" }}
-        />
-      </div>
-    </div>
-  );
-}
-
-/**
- * Explicit "Reload library" action with a real button and visible state machine
- * (idle → syncing spinner → "Updated ✓"), rather than a row that looks like navigation.
- */
-function ReloadLibraryRow({ count, isLoading, onReload }: { count: number; isLoading: boolean; onReload: () => void }) {
-  const [phase, setPhase] = useState<"idle" | "syncing" | "done">("idle");
-  const sawLoading = useRef(false);
-
-  // Watch the global load flag: once a sync we started actually begins and then
-  // finishes, flip to the "done" confirmation.
-  useEffect(() => {
-    if (phase !== "syncing") return;
-    if (isLoading) { sawLoading.current = true; return; }
-    if (sawLoading.current) { sawLoading.current = false; setPhase("done"); }
-  }, [isLoading, phase]);
-
-  // Auto-dismiss "done", and a safety net so "syncing" can never get stuck.
-  useEffect(() => {
-    if (phase === "done") {
-      const t = setTimeout(() => setPhase("idle"), 1800);
-      return () => clearTimeout(t);
-    }
-    if (phase === "syncing") {
-      const t = setTimeout(() => { sawLoading.current = false; setPhase("idle"); }, 15000);
-      return () => clearTimeout(t);
-    }
-  }, [phase]);
-
-  const busy = phase === "syncing" || isLoading;
-  const click = () => {
-    if (busy) return;
-    sawLoading.current = false;
-    setPhase("syncing");
-    onReload();
-  };
-
-  const btn =
-    phase === "done"
-      ? { text: "Updated", bg: "rgba(70,220,140,0.14)", fg: "#5ee0a0", bd: "rgba(70,220,140,0.35)" }
-      : busy
-      ? { text: "Syncing…", bg: "rgba(153,247,255,0.10)", fg: "#99f7ff", bd: "rgba(153,247,255,0.30)" }
-      : { text: "Reload now", bg: "rgba(153,247,255,0.12)", fg: "#99f7ff", bd: "rgba(153,247,255,0.30)" };
-
-  return (
-    <div className="flex items-center justify-between p-6 rounded-xl"
-      style={{ background: "rgba(22,26,38,0.7)", border: "1px solid rgba(46,52,71,0.3)" }}
-    >
-      <div>
-        <p className="font-display font-semibold text-on_surface text-base">Reload library</p>
-        <p className="font-body text-on_surface_variant text-sm mt-0.5">
-          {count} items loaded · re-fetch everything from your server
-        </p>
-      </div>
-      <motion.button
-        data-magnetic
-        data-magnetic-id="settings-reload"
-        onClick={click}
-        disabled={busy && phase !== "done"}
-        className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-body text-sm font-semibold"
-        style={{ background: btn.bg, color: btn.fg, border: `1px solid ${btn.bd}`, cursor: "none" }}
-        whileHover={busy ? {} : { scale: 1.03 }}
-        whileTap={busy ? {} : { scale: 0.97 }}
-      >
-        {phase === "syncing" || isLoading ? (
-          <motion.span
-            animate={{ rotate: 360 }}
-            transition={{ repeat: Infinity, ease: "linear", duration: 0.8 }}
-            style={{ display: "inline-block", width: 14, height: 14, borderRadius: "50%",
-              border: "2px solid rgba(153,247,255,0.3)", borderTopColor: "#99f7ff" }}
-          />
-        ) : phase === "done" ? (
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5ee0a0" strokeWidth="3">
-            <polyline points="20,6 9,17 4,12" />
-          </svg>
-        ) : (
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#99f7ff" strokeWidth="2">
-            <polyline points="23 4 23 10 17 10" />
-            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-          </svg>
-        )}
-        {btn.text}
-      </motion.button>
-    </div>
-  );
-}
-
-function SettingRow({ label, meta, sub, onClick }: { label: string; meta: string; sub: string; onClick?: () => void }) {
-  return (
-    <motion.div
-      data-magnetic
-      data-magnetic-id={`settings-${label}`}
-      onClick={onClick}
-      className="flex items-center justify-between p-6 rounded-xl"
-      style={{
-        background: "rgba(22,26,38,0.7)",
-        border: "1px solid rgba(46,52,71,0.3)",
-        cursor: onClick ? "pointer" : "none",
-      }}
-      whileHover={onClick ? { background: "rgba(30,35,48,0.9)", borderColor: "rgba(153,247,255,0.15)" } : {}}
-      transition={{ duration: 0.2 }}
-    >
-      <div>
-        <p className="font-display font-semibold text-on_surface text-base">{label}</p>
-        <p className="font-body text-on_surface_variant text-sm mt-0.5">{sub}</p>
-      </div>
-      <div className="flex items-center gap-3">
-        <span className="font-mono-tech text-primary text-xs">{meta}</span>
-        {onClick && (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9aa3b4" strokeWidth="2">
-            <polyline points="9,18 15,12 9,6" />
-          </svg>
-        )}
-      </div>
-    </motion.div>
-  );
-}
-
-function SettingsView() {
-  const { t, i18n } = useTranslation();
-  const plexConfig        = useButuStore((s) => s.plexConfig);
-  const jellyfinConfig    = useButuStore((s) => s.jellyfinConfig);
-  const serverType        = useButuStore((s) => s.serverType);
-  const setPlexConfig     = useButuStore((s) => s.setPlexConfig);
-  const setJellyfinConfig = useButuStore((s) => s.setJellyfinConfig);
-  const setServerType     = useButuStore((s) => s.setServerType);
-  const setLibrary        = useButuStore((s) => s.setLibrary);
-  const storeLibrary      = useButuStore((s) => s.library);
-  const settings          = useButuStore((s) => s.settings);
-  const updateSettings    = useButuStore((s) => s.updateSettings);
-  const clearWatchProgress = useButuStore((s) => s.clearWatchProgress);
-  const refreshLibrary    = useButuStore((s) => s.refreshLibrary);
-  const isLoading         = useButuStore((s) => s.jellyfinLoading);
-  const [showMarkerDetect, setShowMarkerDetect] = useState(false);
-  const [showOrganize, setShowOrganize] = useState(false);
-  const [showDonate, setShowDonate] = useState(false);
-  const [cleared, setCleared] = useState(false);
-  const { platform } = usePlatformBridge();
-  const isDesktopApp = platform === PlatformContext.DesktopTauri;
-
-  const active = serverType === "plex" ? plexConfig : serverType === "jellyfin" ? jellyfinConfig : null;
-  const serverLabel = serverType === "plex" ? "PLEX" : "JELLYFIN";
-
-  const disconnect = () => {
-    setPlexConfig(null);
-    setJellyfinConfig(null);
-    setLibrary([]);
-    setServerType(null); // → returns to the setup screen
-  };
-
-  return (
-    <div className="px-4 sm:px-8 lg:px-20 pt-10 pb-20">
-      <h1 className="font-display font-black text-on_surface mb-8" style={{ fontSize: "clamp(2rem, 3.5vw, 3rem)" }}>
-        {t("settings.title")}
-      </h1>
-
-      {active && (
-        <div className="mb-8 p-6 rounded-2xl max-w-2xl"
-          style={{ background: "rgba(22,26,38,0.7)", border: "1px solid rgba(153,247,255,0.1)" }}
-        >
-          <p className="font-mono-tech text-xs text-on_surface_variant mb-1">{serverLabel} SERVER</p>
-          <p className="font-display font-semibold text-on_surface" style={{ wordBreak: "break-all" }}>{active.serverUrl}</p>
-          <p className="font-body text-on_surface_variant text-sm mt-0.5">
-            {active.userName ? <>Signed in as <span style={{ color: "#99f7ff" }}>{active.userName}</span></> : "Connected"}
-            {storeLibrary.length > 0 && ` · ${storeLibrary.length} items`}
-          </p>
-          <motion.button
-            onClick={disconnect}
-            className="mt-4 px-5 py-2 rounded-xl font-body text-sm"
-            style={{ background: "rgba(255,80,80,0.1)", color: "#ff6b6b", border: "1px solid rgba(255,80,80,0.2)", cursor: "none" }}
-            whileHover={{ background: "rgba(255,80,80,0.18)" }}
-            whileTap={{ scale: 0.97 }}
-          >
-            Disconnect
-          </motion.button>
-        </div>
-      )}
-
-      <SettingSection title={t("settings.language", "LANGUAGE").toUpperCase()}>
-        <SettingRow 
-          label={t("settings.english")} 
-          meta={i18n.language.startsWith('en') ? "ACTIVE" : ""} 
-          sub="Switch language to English" 
-          onClick={() => i18n.changeLanguage('en')} 
-        />
-        <SettingRow 
-          label={t("settings.french")} 
-          meta={i18n.language.startsWith('fr') ? "ACTIVE" : ""} 
-          sub="Changer la langue en Français" 
-          onClick={() => i18n.changeLanguage('fr')} 
-        />
-      </SettingSection>
-
-      <SettingSection title="PLAYBACK">
-        <ToggleRow label="Auto-skip intros" sub="Jump past detected intro markers automatically"
-          value={settings.autoSkipIntro} onChange={(v) => updateSettings({ autoSkipIntro: v })} />
-        <ToggleRow label="Auto-skip credits" sub="Jump past end-credits automatically"
-          value={settings.autoSkipCredits} onChange={(v) => updateSettings({ autoSkipCredits: v })} />
-        <ToggleRow label="Auto-play next episode" sub="Continue to the next episode when one ends"
-          value={settings.autoPlayNext} onChange={(v) => updateSettings({ autoPlayNext: v })} />
-        <ToggleRow label="Boost voices" sub="Downmix surround to stereo and lift dialogue so speech isn't drowned out by effects"
-          value={settings.boostVoices} onChange={(v) => updateSettings({ boostVoices: v })} />
-      </SettingSection>
-
-      <SettingSection title="HOME SCREEN">
-        <ToggleRow label="Featured hero" sub="Show the large rotating banner at the top of Home"
-          value={settings.showHero} onChange={(v) => updateSettings({ showHero: v })} />
-        <ToggleRow label="Continue Watching" sub="Show the resume rail on the Home screen"
-          value={settings.showContinueWatching} onChange={(v) => updateSettings({ showContinueWatching: v })} />
-      </SettingSection>
-
-      <SettingSection title="LIBRARY">
-        <ReloadLibraryRow count={storeLibrary.length} isLoading={isLoading} onReload={refreshLibrary} />
-        <SettingRow label="Clear watch history" meta={cleared ? "CLEARED" : "RESET"}
-          sub="Remove all saved playback positions and Continue Watching"
-          onClick={() => { clearWatchProgress(); setCleared(true); }} />
-      </SettingSection>
-
-      {isDesktopApp && (
-        <SettingSection title={t("settings.library_tools", "LIBRARY TOOLS").toUpperCase()}>
-          <SettingRow label={t("settings.organize_label", "Organize downloads")} meta="HARDLINK"
-            sub={t("settings.organize_sub", "Sort a folder of downloaded TV/movies into your Plex/Jellyfin library")}
-            onClick={() => setShowOrganize(true)} />
-        </SettingSection>
-      )}
-
-      <SettingSection title="COMPANION">
-        <SettingRow label="Marker Auto-Detect" meta="INTROS + CREDITS"
-          sub="Fingerprint your library and contribute markers to the Butu cloud DB"
-          onClick={() => setShowMarkerDetect(true)} />
-        <SettingRow label="Air Mouse" meta="COMING SOON"
-          sub="Gyroscopic phone remote — coming soon" />
-      </SettingSection>
-
-      {DONATE_ENABLED && (
-        <SettingSection title="SUPPORT">
-          <SettingRow label="Support Butu" meta="DONATE"
-            sub="Butu is free. If it's useful to you, you can support development ❤"
-            onClick={() => setShowDonate(true)} />
-        </SettingSection>
-      )}
-
-      <AnimatePresence>
-        {showMarkerDetect && <MarkerAutoDetectModal onClose={() => setShowMarkerDetect(false)} />}
-        {showOrganize && <OrganizeModal onClose={() => setShowOrganize(false)} />}
-        {showDonate && <DonateModal onClose={() => setShowDonate(false)} />}
-      </AnimatePresence>
-
-      <div className="mt-10 max-w-2xl">
-        <p className="font-mono-tech text-on_surface_variant text-xs mb-1">BUTU v{__APP_VERSION__}</p>
-        <p className="font-mono-tech text-on_surface_variant text-xs opacity-50">
-          Crowdsourced intro/credits markers · Tauri · React
-        </p>
-      </div>
-    </div>
-  );
-}

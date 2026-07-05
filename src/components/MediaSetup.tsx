@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
-import { useButuStore } from "../store/useButuStore";
+import { useConfigStore } from "../store/useConfigStore";
 import {
   plexSignIn,
   verifyPlexServer,
@@ -31,9 +31,9 @@ const inputStyle = {
 } as const;
 
 export function MediaSetup() {
-  const setPlexConfig = useButuStore((s) => s.setPlexConfig);
-  const setJellyfinConfig = useButuStore((s) => s.setJellyfinConfig);
-  const setServerType = useButuStore((s) => s.setServerType);
+  const setPlexConfig = useConfigStore((s) => s.setPlexConfig);
+  const setJellyfinConfig = useConfigStore((s) => s.setJellyfinConfig);
+  const setServerType = useConfigStore((s) => s.setServerType);
   const { t } = useTranslation();
 
   const [backend, setBackend] = useState<Backend>("plex");

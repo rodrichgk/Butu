@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { motion, useMotionValue, useSpring } from "framer-motion";
-import { useButuStore } from "../store/useButuStore";
+import { useCursorStore } from "../store/useCursorStore";
+import { useLibraryStore } from "../store/useLibraryStore";
 import { isAndroid, isTouch } from "../utils/platform";
 
 // No custom cursor on Android or any touchscreen — there's no mouse to follow.
@@ -8,8 +9,8 @@ const noCursor = isAndroid || isTouch;
 
 // Null on Android — no cursor, no subscriptions, no RAF
 export function LiquidCursor() {
-  const cursor    = useButuStore((s) => s.cursor);
-  const wsConnected = useButuStore((s) => s.wsConnected);
+  const cursor    = useCursorStore((s) => s.cursor);
+  const wsConnected = useLibraryStore((s) => s.wsConnected);
 
   const cursorX = useMotionValue(cursor.x);
   const cursorY = useMotionValue(cursor.y);

@@ -19,9 +19,10 @@ i18n
     load: 'languageOnly',
     detection: {
       // Default to the BROWSER language (never location/IP); a manual choice from the in-app
-      // language switcher persists in localStorage. supportedLngs maps en-US → en, fr-FR → fr,
-      // so an English browser gets English. (Cookie/path/subdomain detection is dropped.)
-      order: ['querystring', 'localStorage', 'navigator', 'htmlTag'],
+      // language switcher persists in localStorage. supportedLngs maps en-US → en, fr-FR → fr.
+      // 'path' is used for URL-based language routing (/en/movies).
+      order: ['path', 'querystring', 'localStorage', 'navigator', 'htmlTag'],
+      lookupFromPathIndex: 0,
       caches: ['localStorage'],
     },
     interpolation: {

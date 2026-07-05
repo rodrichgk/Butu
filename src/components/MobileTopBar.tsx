@@ -1,6 +1,8 @@
+import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useButuStore } from "../store/useButuStore";
+import { useLibraryStore } from "../store/useLibraryStore";
 import { NAV_ITEMS, CATEGORY_IDS } from "./NavigationSidebar";
+import { getActiveSection } from "../utils/routeHelpers";
 
 // ─── Top app bar (touch / phone + tablet layout) ─────────────────────────────
 // The hover sidebar is gone on touch, so this gives back the two things it
@@ -27,8 +29,10 @@ function SettingsIcon() {
 
 export function MobileTopBar() {
   const { t } = useTranslation();
-  const activeSection = useButuStore((s) => s.activeSection);
-  const setActiveSection = useButuStore((s) => s.setActiveSection);
+  const location = useLocation();
+  const activeSection = getActiveSection(location.pathname);
+  const navigate = useNavigate();
+  const setActiveSection = (val: string) => navigate(val === "home" ? "/" : `/${val}`);
 
   const current = NAV_ITEMS.find((i) => i.id === activeSection);
   // Inside a Browse category we're one level deep — show a back chevron (← Browse).

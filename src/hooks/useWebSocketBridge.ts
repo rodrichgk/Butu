@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
-import { useButuStore } from "../store/useButuStore";
+import { useLibraryStore } from "../store/useLibraryStore";
 import { usePlatformBridge } from "./usePlatformBridge";
 import type { SpatialMessage } from "../types";
 
@@ -10,7 +10,7 @@ export function useWebSocketBridge(
   onIMUCoords: (x: number, y: number) => void,
   onPhysicalClick: () => void
 ) {
-  const setWsConnected = useButuStore((s) => s.setWsConnected);
+  const setWsConnected = useLibraryStore((s) => s.setWsConnected);
   const { isStandaloneTV, isTauri } = usePlatformBridge();
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);

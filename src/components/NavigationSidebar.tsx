@@ -1,7 +1,9 @@
+import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useButuStore } from "../store/useButuStore";
+import { useLibraryStore } from "../store/useLibraryStore";
+import { getActiveSection, getLocalizedPath } from "../utils/routeHelpers";
 
 // ─── Layout constants — single source of truth ────────────────────────────────
 const CW        = 56;   // collapsed sidebar width
@@ -122,8 +124,10 @@ function Hairline() {
 // ─── Component ────────────────────────────────────────────────────────────────
 export function NavigationSidebar() {
   const { t } = useTranslation();
-  const activeSection    = useButuStore((s) => s.activeSection);
-  const setActiveSection = useButuStore((s) => s.setActiveSection);
+  const location = useLocation();
+  const activeSection = getActiveSection(location.pathname);
+  const navigate = useNavigate();
+  const setActiveSection = (val: string) => navigate(getLocalizedPath(val === "home" ? "/" : `/${val}`, location.pathname.split("/").filter(Boolean)[0] === "fr" ? "fr" : "en"));
   const [expanded,  setExpanded]  = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 

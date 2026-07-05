@@ -25,7 +25,9 @@ import {
   type ProgressEvent,
   type ShowInput,
 } from "../services/markerDetect";
-import { useButuStore } from "../store/useButuStore";
+import { useConfigStore } from "../store/useConfigStore";
+import { useLibraryStore } from "../store/useLibraryStore";
+import { useLibraryQuery } from "../hooks/useLibraryQuery";
 import { useTranslation } from "react-i18next";
 
 interface Props { onClose: () => void; }
@@ -44,10 +46,10 @@ const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL as string | und
 const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY as string | undefined;
 
 export function MarkerAutoDetectModal({ onClose }: Props) {
-  const plexConfig = useButuStore((s) => s.plexConfig);
-  const jellyfinConfig = useButuStore((s) => s.jellyfinConfig);
-  const serverType = useButuStore((s) => s.serverType);
-  const library    = useButuStore((s) => s.library);
+  const plexConfig = useConfigStore((s) => s.plexConfig);
+  const jellyfinConfig = useConfigStore((s) => s.jellyfinConfig);
+  const serverType = useConfigStore((s) => s.serverType);
+  const { data: library = [] } = useLibraryQuery();
   const { t } = useTranslation();
 
   const analyzable = useMemo(
@@ -55,6 +57,20 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
     [library],
   );
   const [selectedShows, setSelectedShows] = useState<Set<string>>(new Set());
+  const [forceReanalyze, setForceReanalyze] = useState(false);
+  const [analyzedShows, setAnalyzedShows] = useState<Set<string>>(() => {
+    try {
+      const data = localStorage.getItem("butu_analyzed_shows");
+      return data ? new Set(JSON.parse(data)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("butu_analyzed_shows", JSON.stringify([...analyzedShows]));
+  }, [analyzedShows]);
+
   // The library loads asynchronously, so a selection captured once at mount goes
   // stale — it holds ids no longer in the (re)loaded library, so buildShowInputs
   // gets an empty slice and reports "nothing to analyze" even though items exist.
@@ -194,7 +210,14 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
     // (e.g. it was seeded before the library finished loading) so we never
     // silently send nothing to the analyzer.
     const selectedSlice = library.filter((i) => selectedShows.has(i.id));
-    const slice = selectedSlice.length > 0 ? selectedSlice : analyzable;
+    const rawSlice = selectedSlice.length > 0 ? selectedSlice : analyzable;
+    const slice = forceReanalyze ? rawSlice : rawSlice.filter((i) => !analyzedShows.has(i.id));
+
+    if (slice.length === 0) {
+      setError(t('marker.err_all_analyzed', 'All selected items have already been analyzed. Check "Re-analyze already-processed shows" to force analysis.'));
+      setPhase("error");
+      return;
+    }
 
     // Only constrain a show's seasons when a strict subset (or none) is picked.
     const seasonFilter: Record<string, number[]> = {};
@@ -224,6 +247,12 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
       showsRef.current = shows;
       showProgressTotal.current = shows.length;
       await runAnalysis(shows);  // long-running (fast pipeline); events drive the UI
+
+      setAnalyzedShows(prev => {
+        const next = new Set(prev);
+        slice.forEach((item) => next.add(item.id));
+        return next;
+      });
     } catch (e: any) {
       if (abort.signal.aborted) return;
       // Keep the technical breakdown in the console for debugging; show a
@@ -341,7 +370,7 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
                 {t('marker.select_instruction')}
               </p>
 
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 <button
                   onClick={() => setSelectedShows(new Set(analyzable.map(s => s.id)))}
                   style={{ ...btnGhost, padding: "6px 12px", fontSize: 12 }}
@@ -354,6 +383,16 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
                 >
                   {t('marker.deselect_all')}
                 </button>
+                <div style={{ width: "1px", height: "16px", background: "rgba(255,255,255,0.2)", margin: "0 8px" }} />
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, color: "#e0e6f0" }}>
+                  <input
+                    type="checkbox"
+                    checked={forceReanalyze}
+                    onChange={(e) => setForceReanalyze(e.target.checked)}
+                    style={{ width: 16, height: 16, accentColor: "#99f7ff", cursor: "pointer" }}
+                  />
+                  {t('marker.reanalyze_processed', 'Re-analyze already-processed shows')}
+                </label>
               </div>
 
               <div style={{ 
@@ -370,8 +409,10 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
                     const sel = seasonSel[show.id];
                     const canExpand = show.type !== "movie";
                     const subset = seasons && sel && sel.size < seasons.length;
+                    const isAnalyzed = analyzedShows.has(show.id) && !forceReanalyze;
+                    
                     return (
-                      <div key={show.id} style={{ display: "flex", flexDirection: "column" }}>
+                      <div key={show.id} style={{ display: "flex", flexDirection: "column", opacity: isAnalyzed ? 0.5 : 1 }}>
                         <div style={{
                           display: "flex", alignItems: "center", gap: 12, padding: "8px 12px",
                           background: "rgba(255,255,255,0.02)", borderRadius: 8,
@@ -379,27 +420,30 @@ export function MarkerAutoDetectModal({ onClose }: Props) {
                           <input
                             type="checkbox"
                             checked={checked}
+                            disabled={isAnalyzed}
                             onChange={(e) => {
                               const next = new Set(selectedShows);
                               if (e.target.checked) next.add(show.id); else next.delete(show.id);
                               setSelectedShows(next);
                             }}
-                            style={{ width: 16, height: 16, accentColor: "#99f7ff", cursor: "pointer" }}
+                            style={{ width: 16, height: 16, accentColor: "#99f7ff", cursor: isAnalyzed ? "not-allowed" : "pointer" }}
                           />
                           <span style={{ fontSize: 14, flex: 1, color: checked ? "#e0e6f0" : "#9aa3b4" }}>
                             {show.title}
+                            {isAnalyzed && <span style={{ marginLeft: 8, fontSize: 11, color: "#6b7585" }}>({t('marker.analyzed', 'Analyzed')})</span>}
                             {subset && <span style={{ color: "#99f7ff", fontSize: 11, marginLeft: 8 }}>· {sel!.size}/{seasons!.length} {t('marker.seasons_count', { count: '' }).trim()}</span>}
                           </span>
                           {canExpand && (
                             <button
                               onClick={() => toggleExpand(show)}
-                              style={{ ...btnGhost, padding: "3px 8px", fontSize: 11 }}
+                              disabled={isAnalyzed}
+                              style={{ ...btnGhost, padding: "3px 8px", fontSize: 11, cursor: isAnalyzed ? "not-allowed" : "pointer" }}
                             >
                               {isExpanded ? t('marker.collapse_seasons') : t('marker.expand_seasons')}
                             </button>
                           )}
                         </div>
-                        {isExpanded && canExpand && (
+                        {isExpanded && canExpand && !isAnalyzed && (
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: "6px 12px 8px 40px" }}>
                             {loadingSeasons === show.id ? (
                               <span style={{ fontSize: 12, color: "#5a6473" }}>{t('marker.loading_seasons')}</span>

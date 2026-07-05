@@ -49,7 +49,7 @@ export function SplashScreen({ onComplete, duration = 4200 }: SplashScreenProps)
             y: { duration: 1.0, delay: 0.95, ease: [0.16, 1, 0.3, 1] },
           }}
         >
-          <Logo size={150} glow />
+          <Logo size={250} glow />
         </motion.div>
 
         {/* "butu": each letter starts collapsed at the centre and spreads outward

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useCallback } from "react";
-import { useButuStore } from "../store/useButuStore";
+import { tauriListen } from "../services/tauri";
+import { useCursorStore } from "../store/useCursorStore";
+import { useLibraryStore } from "../store/useLibraryStore";
 import { isAndroid, isAndroidTV } from "../utils/tvOptimizations";
 
 const SNAP_RADIUS    = 120;
@@ -12,8 +14,8 @@ const TV_SMOOTHING = 0.08; // Faster response for TV remote
 const TV_CACHE_DURATION = 300; // Longer cache for TV
 
 export function useSpatialCursor() {
-  const setCursor        = useButuStore((s) => s.setCursor);
-  const setFocusedCardId = useButuStore((s) => s.setFocusedCardId);
+  const setCursor        = useCursorStore((s) => s.setCursor);
+  const setFocusedCardId = useLibraryStore((s) => s.setFocusedCardId);
 
   const rawPos    = useRef({ x: window.innerWidth / 2,  y: window.innerHeight / 2 });
   const smoothPos = useRef({ x: window.innerWidth / 2,  y: window.innerHeight / 2 });
@@ -117,16 +119,22 @@ export function useSpatialCursor() {
   }, [animate]);
 
   useEffect(() => {
-    const handler = (e: Event) => {
-      const { x, y } = (e as CustomEvent<{ x: number; y: number }>).detail ?? {};
-      if (x != null) rawPos.current = { x, y };
-    };
-    window.addEventListener("spatial-coords", handler);
-    return () => window.removeEventListener("spatial-coords", handler);
+    let unlisten: (() => void) | undefined;
+    tauriListen<{ x: number; y: number }>("spatial-coords", (e) => {
+      const { x, y } = e;
+      if (x != null) {
+        rawPos.current = { 
+          x: x * window.innerWidth, 
+          y: y * window.innerHeight 
+        };
+      }
+    }).then((f) => { unlisten = f; });
+    return () => unlisten?.();
   }, []);
 
   // SELECT = focus + Enter + click
   useEffect(() => {
+    let unlisten: (() => void) | undefined;
     const handleClick = () => {
       const el = snappedTarget.current
         ?? document.elementFromPoint(smoothPos.current.x, smoothPos.current.y);
@@ -138,8 +146,8 @@ export function useSpatialCursor() {
       target.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
       target.click();
     };
-    window.addEventListener("spatial-click", handleClick);
-    return () => window.removeEventListener("spatial-click", handleClick);
+    tauriListen("spatial-click", handleClick).then((f) => { unlisten = f; });
+    return () => unlisten?.();
   }, []);
 
   const updateFromIMU = useCallback((x: number, y: number) => {

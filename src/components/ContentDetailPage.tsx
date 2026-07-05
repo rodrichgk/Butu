@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { MediaItem, Episode } from "../types";
-import { useButuStore } from "../store/useButuStore";
-import { fetchPlexEpisodes, plexRawToEpisode } from "../services/plexApi";
+import { useConfigStore } from "../store/useConfigStore";
+import { useLibraryStore } from "../store/useLibraryStore";
+import { useEpisodesQuery } from "../hooks/useEpisodesQuery";
 import { useTranslation } from "react-i18next";
 
 function fmt(s: number): string {
@@ -29,13 +30,12 @@ interface Props {
 }
 
 export function ContentDetailPage({ item, onPlay, onClose }: Props) {
-  const watchProgress = useButuStore((s) => s.watchProgress);
-  const plexConfig    = useButuStore((s) => s.plexConfig);
+  const watchProgress = useLibraryStore((s) => s.watchProgress);
+  const plexConfig    = useConfigStore((s) => s.plexConfig);
   // Movie / non-episodic resume point (keyed by the title's own id).
   const prog = watchProgress[item.id];
 
-  const [loadedEpisodes, setLoadedEpisodes] = useState<Episode[]>(item.episodes ?? []);
-  const [episodesLoading, setEpisodesLoading] = useState(false);
+  const { data: loadedEpisodes = [], isLoading: episodesLoading } = useEpisodesQuery(item);
   const playBtnRef = useRef<HTMLButtonElement>(null);
   const { t } = useTranslation();
 
@@ -60,27 +60,6 @@ export function ContentDetailPage({ item, onPlay, onClose }: Props) {
       .catch(() => {}); // AbortError and network errors are both fine here
     return () => controller.abort();
   }, [item.id, item.streamUrl]);
-
-  // Fetch episodes from Plex on-demand for TV shows
-  useEffect(() => {
-    const isPlexShow =
-      (item.type === "tv" || item.type === "anime") &&
-      item.plexKey &&
-      plexConfig &&
-      !item.episodes?.length;
-
-    if (!isPlexShow) return;
-
-    let cancelled = false;
-    setEpisodesLoading(true);
-    fetchPlexEpisodes(plexConfig!, `/library/metadata/${item.id}`)
-      .then((raws) => {
-        if (!cancelled) setLoadedEpisodes(raws.map((r) => plexRawToEpisode(r, plexConfig!)));
-      })
-      .finally(() => { if (!cancelled) setEpisodesLoading(false); });
-
-    return () => { cancelled = true; };
-  }, [item.id, item.plexKey, item.type, plexConfig]);
 
   // Episodes in a stable play order (season, then episode number) — used for
   // the season grid, the resume lookup, and the auto-next playlist.

@@ -1,7 +1,9 @@
+import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
-import { useButuStore } from "../store/useButuStore";
-import { NAV_ITEMS, CATEGORY_IDS } from "./NavigationSidebar";
+import { useLibraryStore } from "../store/useLibraryStore";
+import { CATEGORY_IDS, NAV_ITEMS } from "./NavigationSidebar";
+import { getActiveSection, getLocalizedPath } from "../utils/routeHelpers";
 
 // ─── Bottom tab bar (touch / phone + tablet layout) ───────────────────────────
 // A tab bar works best with ≤5 destinations (Apple HIG / Material), and each tab
@@ -33,8 +35,10 @@ const PRIMARY = [
 
 export function MobileNav() {
   const { t } = useTranslation();
-  const activeSection = useButuStore((s) => s.activeSection);
-  const setActiveSection = useButuStore((s) => s.setActiveSection);
+  const location = useLocation();
+  const activeSection = getActiveSection(location.pathname);
+  const navigate = useNavigate();
+  const setActiveSection = (val: string) => navigate(getLocalizedPath(val === "home" ? "/" : `/${val}`, location.pathname.split("/").filter(Boolean)[0] === "fr" ? "fr" : "en"));
 
   // Browse stays selected while the user is inside one of its categories,
   // exactly like Apple Music keeps "Library" lit while you're in Albums.

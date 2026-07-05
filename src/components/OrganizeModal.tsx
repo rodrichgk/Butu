@@ -12,7 +12,7 @@
  */
 import { useMemo, useState, type CSSProperties } from "react";
 import { motion } from "framer-motion";
-import { useButuStore } from "../store/useButuStore";
+import { useConfigStore } from "../store/useConfigStore";
 import {
   organizePlan,
   organizeExecute,
@@ -95,8 +95,8 @@ const monoMuted: CSSProperties = {
 };
 
 export function OrganizeModal({ onClose }: Props) {
-  const config = useButuStore((s) => s.organizeConfig);
-  const setConfig = useButuStore((s) => s.setOrganizeConfig);
+  const config = useConfigStore((s) => s.organizeConfig);
+  const setConfig = useConfigStore((s) => s.setOrganizeConfig);
 
   const [view, setView] = useState<View>("start");
   const [busy, setBusy] = useState(false);

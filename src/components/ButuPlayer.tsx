@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useButuStore } from "../store/useButuStore";
+import { usePlayerStore } from "../store/usePlayerStore";
+import { useConfigStore } from "../store/useConfigStore";
 import type { MediaItem } from "../types";
 import {
   reportStart,
@@ -54,11 +55,11 @@ export function ButuPlayer({ item, initialTime, onClose }: ButuPlayerProps) {
   const [subUrl, setSubUrl] = useState<string | null>(null);
   const resumeAtRef = useRef<number | null>(null);
 
-  const setPlayer       = useButuStore((s) => s.setPlayer);
-  const jellyfinConfig   = useButuStore((s) => s.jellyfinConfig);
-  const plexConfig       = useButuStore((s) => s.plexConfig);
-  const serverType       = useButuStore((s) => s.serverType);
-  const settings         = useButuStore((s) => s.settings);
+  const setPlayer       = usePlayerStore((s) => s.setPlayer);
+  const jellyfinConfig   = useConfigStore((s) => s.jellyfinConfig);
+  const plexConfig       = useConfigStore((s) => s.plexConfig);
+  const serverType       = useConfigStore((s) => s.serverType);
+  const settings         = useConfigStore((s) => s.settings);
   const progressTimer    = useRef<ReturnType<typeof setInterval> | null>(null);
   const { t } = useTranslation();
 

@@ -15,24 +15,18 @@ interface LogoProps {
  */
 export function Logo({ size = 120, glow = false, className, style }: LogoProps) {
   return (
-    <span
+    <img
+      src="/logo_symbol.svg"
+      alt="Butu Logo"
       className={className}
       style={{
-        fontFamily: "'Poppins', sans-serif",
-        fontWeight: 700,
-        fontSize: size,
-        lineHeight: 1,
+        width: size,
+        height: size,
+        objectFit: "contain",
         userSelect: "none",
-        color: "transparent",
-        backgroundClip: "text",
-        WebkitBackgroundClip: "text",
-        backgroundImage:
-          "linear-gradient(165deg, #e6fdff 12%, #99f7ff 58%, #4fd0e6 100%)",
         filter: glow ? "drop-shadow(0 0 26px rgba(153,247,255,0.45))" : undefined,
         ...style,
       }}
-    >
-      B
-    </span>
+    />
   );
 }

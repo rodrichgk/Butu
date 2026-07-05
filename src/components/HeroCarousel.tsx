@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useButuStore } from "../store/useButuStore";
+import { usePlayerStore } from "../store/usePlayerStore";
 import type { MediaItem } from "../types";
 import { useTranslation } from "react-i18next";
 
@@ -59,7 +59,7 @@ const metaVariants = {
 // ─── Component ────────────────────────────────────────────────────────────────
 export function HeroCarousel({ items, onSelect }: HeroCarouselProps) {
   const [activeIdx, setActiveIdx] = useState(0);
-  const setPlayer    = useButuStore((s) => s.setPlayer);
+  const setPlayer    = usePlayerStore((s) => s.setPlayer);
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
   const preloadedRef = useRef(false);
   const { t } = useTranslation();
