@@ -345,7 +345,15 @@ export async function fetchPlexResources(token: string): Promise<PlexServer[]> {
 }
 
 async function pingPlex(uri: string, token: string, timeoutMs: number): Promise<boolean> {
-  const ping = verifyPlexServer(uri, token).then(() => true).catch(() => false);
+  const ping = verifyPlexServer(uri, token)
+    .then(() => {
+      console.info(`[butu:conn] reachable ${uri}`);
+      return true;
+    })
+    .catch((e) => {
+      console.warn(`[butu:conn] unreachable ${uri}: ${e?.message ?? e}`);
+      return false;
+    });
   const timeout = new Promise<boolean>((r) => setTimeout(() => r(false), timeoutMs));
   return Promise.race([ping, timeout]);
 }
@@ -385,11 +393,18 @@ export async function pickPlexConnection(server: PlexServer, timeoutMs = 4000): 
   const local  = onWeb ? [] : server.connections.filter((c) => c.local && !c.relay);
   const remote = server.connections.filter((c) => !c.local && !c.relay);
   const relay  = server.connections.filter((c) => c.relay);
-  return (
+  console.info(
+    `[butu:conn] ${server.name} (web=${onWeb}) connections:`,
+    server.connections.map(
+      (c) => `${c.uri} [${c.local ? "local" : c.relay ? "relay" : "remote"}]`,
+    ),
+  );
+  const chosen =
     (await raceReachable(local, server.accessToken, timeoutMs)) ??
     (await raceReachable(remote, server.accessToken, timeoutMs)) ??
-    (await raceReachable(relay, server.accessToken, timeoutMs))
-  );
+    (await raceReachable(relay, server.accessToken, timeoutMs));
+  console.info(`[butu:conn] ${server.name} chosen: ${chosen ?? "NONE"}`);
+  return chosen;
 }
 
 // ─── Library sections ─────────────────────────────────────────────────────────
