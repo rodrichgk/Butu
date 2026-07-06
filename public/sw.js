@@ -1,5 +1,5 @@
 // Service Worker for offline-first architecture and intelligent caching
-const CACHE_VERSION = 'butu-v4';
+const CACHE_VERSION = 'butu-v5';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 const IMAGE_CACHE = `${CACHE_VERSION}-images`;
@@ -67,10 +67,16 @@ self.addEventListener('fetch', (event) => {
     url.pathname.includes('.m4s')   // fMP4 segments used by Plex directStream
   ) {
     event.respondWith(videoStrategy(request));
-  } else if (url.hostname.endsWith('.plex.direct') || url.pathname.startsWith('/api/')) {
-    // Plex API (identity / library / children…) — go to the live server first so a
-    // freshly-fixed connection shows real data instead of a stale cached library that
-    // masks a broken connection. Falls back to cache only when the network fails.
+  } else if (url.hostname.endsWith('.plex.direct')) {
+    // Cross-origin Plex API JSON (identity / library / children…). Do NOT intercept:
+    // wrapping these in the SW turns CORS / Private-Network-Access failures into opaque
+    // "Failed to fetch" errors here, and network-first can serve a stale cached library
+    // that masks a broken connection (or the wrong local-vs-relay one). Let the browser
+    // issue the request natively with real CORS. (Art images and video segments are
+    // already handled by the image/video branches above, so they still cache.)
+    return;
+  } else if (url.pathname.startsWith('/api/')) {
+    // Same-origin app API (if any) — live-first, fall back to cache when offline.
     event.respondWith(networkFirstStrategy(request));
   } else {
     event.respondWith(cacheFirstStrategy(request));

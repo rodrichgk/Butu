@@ -363,13 +363,26 @@ function raceReachable(conns: PlexConnection[], token: string, timeoutMs: number
   });
 }
 
+/** True inside the Tauri desktop app (which proxies HTTP through Rust — no CORS/PNA). */
+function isTauriRuntime(): boolean {
+  // @ts-ignore — injected by Tauri at runtime
+  return typeof window !== "undefined" && !!(window.__TAURI__?.core ?? window.__TAURI_INTERNALS__);
+}
+
 /**
  * Picks the best working connection for a server: local first (fast LAN), then
  * remote (direct/port-forwarded), then relay (plex.tv-proxied — works anywhere).
  * Returns the reachable uri, or null if the server can't be reached at all.
+ *
+ * On the WEB, a public origin (butu.fr) cannot `fetch()` a LAN address — Chrome's
+ * Private Network Access blocks public→private, so a `local` connection is not just
+ * slow but *impossible* and only spams "access the local address space" errors while
+ * burning the probe budget. So skip local on web and go straight to remote/relay,
+ * which are public and reachable from anywhere. The desktop app has no such limit.
  */
 export async function pickPlexConnection(server: PlexServer, timeoutMs = 4000): Promise<string | null> {
-  const local  = server.connections.filter((c) => c.local && !c.relay);
+  const onWeb  = !isTauriRuntime();
+  const local  = onWeb ? [] : server.connections.filter((c) => c.local && !c.relay);
   const remote = server.connections.filter((c) => !c.local && !c.relay);
   const relay  = server.connections.filter((c) => c.relay);
   return (
