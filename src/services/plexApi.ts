@@ -143,17 +143,32 @@ export interface PlexTrack {
  *  so we burn/mux the chosen one server-side (see applyPlexTracks). */
 export async function fetchPlexTracks(cfg: PlexConfig, ratingKey: string): Promise<PlexTrack[]> {
   const base = cfg.serverUrl.replace(/\/$/, "");
-  const data = await plexFetch(`${base}/library/metadata/${ratingKey}`, cfg.token).catch(() => ({}));
+  const url = `${base}/library/metadata/${ratingKey}`;
+  const data = await plexFetch(url, cfg.token).catch((e) => {
+    // The CC menu only renders when this returns tracks — so if the fetch itself
+    // fails (CORS, mixed-content, unreachable), surface it instead of a silent [].
+    console.warn(`[butu:cc] track metadata fetch failed for ${url}:`, e);
+    return {} as any;
+  });
   const meta = (data.MediaContainer?.Metadata ?? [])[0];
   const streams: any[] = meta?.Media?.[0]?.Part?.[0]?.Stream ?? [];
-  return streams
+  const tracks = streams
     .filter((s) => s.streamType === 2 || s.streamType === 3) // 2 = audio, 3 = subtitle
     .map((s) => ({
       id: String(s.id),
-      type: s.streamType === 2 ? "Audio" : "Subtitle",
+      type: (s.streamType === 2 ? "Audio" : "Subtitle") as "Audio" | "Subtitle",
       label: s.extendedDisplayTitle || s.displayTitle || s.title || s.language || `${s.streamType === 2 ? "Audio" : "Subtitle"} ${s.id}`,
       language: s.language,
     }));
+  if (tracks.length === 0) {
+    // Fetch succeeded but nothing to show — tells us whether it's the id (no meta),
+    // a container id vs a playable one (meta but no Media/Part), or stream filtering.
+    console.warn(
+      `[butu:cc] no audio/subtitle tracks for ratingKey ${ratingKey} — ` +
+        `meta:${!!meta} media:${!!meta?.Media?.[0]} part:${!!meta?.Media?.[0]?.Part?.[0]} streams:${streams.length}`,
+    );
+  }
+  return tracks;
 }
 
 /**
