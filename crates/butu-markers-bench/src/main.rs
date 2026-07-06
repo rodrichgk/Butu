@@ -237,7 +237,19 @@ async fn run_once(
     let start = Instant::now();
     let res = match algo {
         "legacy" => analyze(runner.clone(), sink, shows.to_vec(), cancel).await,
-        "fast" => analyze_fast(runner.clone(), sink, shows.to_vec(), cancel, concurrency).await,
+        // No FingerprintCache here — the bench does its own decode caching at the
+        // MediaRunner level (CachingRunner), so pass None.
+        "fast" => {
+            analyze_fast(
+                runner.clone(),
+                sink,
+                shows.to_vec(),
+                cancel,
+                concurrency,
+                None,
+            )
+            .await
+        }
         other => {
             eprintln!("unknown algo '{other}', skipping");
             Ok(Vec::new())
