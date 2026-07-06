@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
 import { useConfigStore } from "../store/useConfigStore";
-import { type PlexServer, plexPinAuthUrl } from "../services/plexApi";
+import { type PlexServer, plexPinAuthUrl, isWebUnreachableLanOnly } from "../services/plexApi";
 import {
   usePlexSignIn,
   usePlexResources,
@@ -126,15 +126,19 @@ export function MediaSetup() {
   function pickServer(server: PlexServer) {
     setConnecting(server.clientIdentifier);
     setError(null);
+    const reachError = () =>
+      isWebUnreachableLanOnly(server)
+        ? t('setup.server_lan_only', { name: server.name })
+        : t('setup.couldnt_reach_server', { name: server.name });
     connectionMutation.mutate(server, {
       onSuccess: (uri) => {
         setConnecting(null);
         if (uri) save(uri, server.accessToken, server.name);
-        else setError(t('setup.couldnt_reach_server', { name: server.name }));
+        else setError(reachError());
       },
       onError: () => {
         setConnecting(null);
-        setError(t('setup.couldnt_reach_server', { name: server.name }));
+        setError(reachError());
       }
     });
   }

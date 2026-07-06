@@ -378,6 +378,20 @@ function isTauriRuntime(): boolean {
 }
 
 /**
+ * On the WEB, a server that only advertises LAN connections is genuinely unreachable
+ * — a cloud-hosted origin can't reach a home LAN, and even a server-side proxy is in
+ * the cloud and equally can't. The fix is server-side (enable Plex Remote Access/Relay)
+ * or use the desktop app. Lets the UI show that instead of a misleading "server offline".
+ */
+export function isWebUnreachableLanOnly(server: PlexServer): boolean {
+  return (
+    !isTauriRuntime() &&
+    server.connections.length > 0 &&
+    server.connections.every((c) => c.local && !c.relay)
+  );
+}
+
+/**
  * Picks the best working connection for a server: local first (fast LAN), then
  * remote (direct/port-forwarded), then relay (plex.tv-proxied — works anywhere).
  * Returns the reachable uri, or null if the server can't be reached at all.

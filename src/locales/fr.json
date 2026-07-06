@@ -86,6 +86,7 @@
     "username_password_required": "Nom d'utilisateur et mot de passe requis",
     "login_failed_credentials": "Échec de connexion. Vérifiez vos identifiants.",
     "couldnt_reach_server": "Impossible de joindre \"{{name}}\". Le serveur est hors ligne ou entrez son adresse manuellement.",
+    "server_lan_only": "\"{{name}}\" n'a qu'une adresse locale (réseau domestique), qu'un site web ne peut pas joindre. Activez l'accès distant Plex sur le serveur, ou utilisez l'app de bureau Butu sur le même réseau.",
     "couldnt_reach_manual": "Impossible de joindre ce serveur avec votre compte. Vérifiez l'URL, ex: http://192.168.1.53:32400.",
     "jellyfin_login_failed": "Échec de connexion Jellyfin. Vérifiez l'adresse et les identifiants.",
     "server_address_required": "L'adresse du serveur et le nom d'utilisateur sont requis",
