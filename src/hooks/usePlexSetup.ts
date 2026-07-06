@@ -24,6 +24,13 @@ export function usePlexResources(token: string | null) {
     },
     enabled: !!token,
     retry: 1,
+    // A server's connections change the moment the user toggles Remote Access / Relay,
+    // so never reuse a cached list here — always re-fetch the live connection set when
+    // (re)entering discovery. Otherwise "I just enabled Relay" shows the stale pre-relay
+    // list and the connect keeps failing. Overrides the global 5-min staleTime.
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
   });
 }
 
