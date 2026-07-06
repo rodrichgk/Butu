@@ -404,7 +404,7 @@ export function isWebUnreachableLanOnly(server: PlexServer): boolean {
  */
 export async function pickPlexConnection(server: PlexServer, timeoutMs = 4000): Promise<string | null> {
   const onWeb  = !isTauriRuntime();
-  const local  = onWeb ? [] : server.connections.filter((c) => c.local && !c.relay);
+  const local  = server.connections.filter((c) => c.local && !c.relay);
   const remote = server.connections.filter((c) => !c.local && !c.relay);
   const relay  = server.connections.filter((c) => c.relay);
   console.info(
