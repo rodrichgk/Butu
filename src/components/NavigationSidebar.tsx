@@ -127,7 +127,7 @@ export function NavigationSidebar() {
   const location = useLocation();
   const activeSection = getActiveSection(location.pathname);
   const navigate = useNavigate();
-  const setActiveSection = (val: string) => navigate(getLocalizedPath(val === "home" ? "/" : `/${val}`, location.pathname.split("/").filter(Boolean)[0] === "fr" ? "fr" : "en"));
+  const setActiveSection = (val: string) => navigate(getLocalizedPath(val === "home" ? "/my-media" : `/${val}`, location.pathname.split("/").filter(Boolean)[0] === "fr" ? "fr" : "en"));
   const [expanded,  setExpanded]  = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 

@@ -38,7 +38,7 @@ export function MobileNav() {
   const location = useLocation();
   const activeSection = getActiveSection(location.pathname);
   const navigate = useNavigate();
-  const setActiveSection = (val: string) => navigate(getLocalizedPath(val === "home" ? "/" : `/${val}`, location.pathname.split("/").filter(Boolean)[0] === "fr" ? "fr" : "en"));
+  const setActiveSection = (val: string) => navigate(getLocalizedPath(val === "home" ? "/my-media" : `/${val}`, location.pathname.split("/").filter(Boolean)[0] === "fr" ? "fr" : "en"));
 
   // Browse stays selected while the user is inside one of its categories,
   // exactly like Apple Music keeps "Library" lit while you're in Albums.

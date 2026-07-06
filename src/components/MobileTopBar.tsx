@@ -32,7 +32,7 @@ export function MobileTopBar() {
   const location = useLocation();
   const activeSection = getActiveSection(location.pathname);
   const navigate = useNavigate();
-  const setActiveSection = (val: string) => navigate(val === "home" ? "/" : `/${val}`);
+  const setActiveSection = (val: string) => navigate(val === "home" ? "/my-media" : `/${val}`);
 
   const current = NAV_ITEMS.find((i) => i.id === activeSection);
   // Inside a Browse category we're one level deep — show a back chevron (← Browse).

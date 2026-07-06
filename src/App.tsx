@@ -316,15 +316,33 @@ export default function App() {
     setSearchParams((prevParams) => { prevParams.set("play", prev.id); return prevParams; }, { replace: true });
   }, [hasPrev, playerPlaylist, playlistIdx, setSearchParams]);
 
-  const setActiveSection = useCallback((val: string) => navigate(getLocalizedPath(val === "home" ? "/" : `/${val}`, location.pathname.split("/").filter(Boolean)[0] === "fr" ? "fr" : "en")), [navigate, location.pathname]);
+  const setActiveSection = useCallback((val: string) => navigate(getLocalizedPath(val === "home" ? "/my-media" : `/${val}`, location.pathname.split("/").filter(Boolean)[0] === "fr" ? "fr" : "en")), [navigate, location.pathname]);
   const serverType       = useConfigStore((s) => s.serverType);
   
   // Landing → setup gate. Once a server is connected, it resets so a signed-out visitor always lands on the explainer, not straight on the form.
-  useEffect(() => { 
+  useEffect(() => {
     if (serverType && activeSection === "connect") {
-      setActiveSection("home"); 
+      setActiveSection("home");
     }
   }, [serverType, activeSection, setActiveSection]);
+
+  // When signed OUT the whole app renders the Landing (see the gate below). Keep
+  // the URL matching that — otherwise a stale/deep link like /fr/settings sits on
+  // the Landing with a mismatched address. Normalize everything except the
+  // landing ("/:lang") and the connect form to "/:lang".
+  useEffect(() => {
+    const connected =
+      !!serverType &&
+      ((serverType === "jellyfin" && !!jellyfinConfig) || (serverType === "plex" && !!plexConfig));
+    if (connected) return;
+    const parts = location.pathname.split("/").filter(Boolean);
+    const hasLang = parts[0] === "fr" || parts[0] === "en";
+    const lang = hasLang ? parts[0] : i18n.language?.startsWith("fr") ? "fr" : "en";
+    const sub = (hasLang ? parts.slice(1) : parts).join("/");
+    if (sub !== "" && sub !== "connect") {
+      navigate(`/${lang}`, { replace: true });
+    }
+  }, [serverType, jellyfinConfig, plexConfig, location.pathname, navigate]);
   
   
 
@@ -500,7 +518,9 @@ export default function App() {
         >
           <Routes>
             <Route path="/:lang">
-              <Route index element={
+              {/* Signed-in landing at "/" → the media home lives at /my-media. */}
+              <Route index element={<Navigate to="my-media" replace />} />
+              <Route path="my-media" element={
                 <>
                   {settings.showContinueWatching && continueWatching.length > 0 && (
                     <MediaStage

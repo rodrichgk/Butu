@@ -11,6 +11,9 @@ export function getActiveSection(pathname: string): string {
 
   if (parts.length === 0) return "home";
 
+  // The media home lives at /:lang/my-media (distinct from the "/" landing).
+  if (parts[0] === "my-media") return "home";
+
   return parts[0];
 }
 

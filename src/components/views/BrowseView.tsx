@@ -15,7 +15,7 @@ const BROWSE_TYPE: Record<string, string> = {
 export default function BrowseView() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const setActiveSection = (val: string) => navigate(val === "home" ? "/" : `/${val}`);
+  const setActiveSection = (val: string) => navigate(val === "home" ? "/my-media" : `/${val}`);
   const { data: library = [] } = useLibraryQuery();
 
   const countFor = (id: string) => library.filter((i) => i.type === BROWSE_TYPE[id]).length;

@@ -19,7 +19,7 @@ import { useLibraryQuery } from "../hooks/useLibraryQuery";
 export function HomeStatus() {
   const { isLoading: loading, error, refetch: refresh } = useLibraryQuery();
   const navigate = useNavigate();
-  const setActiveSection = (val: string) => navigate(val === "home" ? "/" : `/${val}`);
+  const setActiveSection = (val: string) => navigate(val === "home" ? "/my-media" : `/${val}`);
 
   return (
     <div className="px-4 sm:px-8 lg:px-20 py-24 flex flex-col items-center text-center gap-3">
