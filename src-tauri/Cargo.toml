@@ -1,6 +1,6 @@
 [package]
 name = "butu"
-version = "0.1.2"
+version = "0.1.3"
 description = "Butu — A high-performance, TV-optimized cinematic media client"
 authors = ["Butu"]
 license = ""
