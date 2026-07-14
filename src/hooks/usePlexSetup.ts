@@ -52,6 +52,10 @@ export function usePlexPinPoll(pinId: number | undefined, enabled: boolean) {
     enabled: enabled && !!pinId,
     refetchInterval: (query) => (query.state.data ? false : 2000), // stop polling once we get a token
     retry: true,
+    // The queryFn throws until the user links, so polling cadence is really the
+    // RETRY delay — and the default is exponential backoff capped at 30s, which
+    // made link detection take up to 30s ("waiting to link" looked stuck).
+    retryDelay: 2000,
   });
 }
 

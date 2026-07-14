@@ -4,17 +4,34 @@ import dev.butu.data.config.PlexConfig
 import dev.butu.domain.Episode
 import dev.butu.domain.MediaItem
 import dev.butu.domain.MediaType
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import retrofit2.Retrofit
+import java.io.IOException
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.resume
 import kotlin.random.Random
+
+private const val PROBE_TIMEOUT_MS = 5_000L
+
+// A cold plex.tv relay tunnel routinely takes >4s to wake on the first request,
+// then answers instantly on the next — which read as "login randomly fails,
+// retry works". Give relay its own, longer budget.
+private const val RELAY_TIMEOUT_MS = 15_000L
 
 @Singleton
 class PlexRepository @Inject constructor(
@@ -157,30 +174,101 @@ class PlexRepository @Inject constructor(
             .sortedByDescending { it.owned }
 
     /**
-     * Picks the first reachable connection for a server: local (fast LAN) →
-     * remote (direct/port-forwarded) → relay (plex.tv-proxied). Returns the
-     * working URI, or null if none answer. Uses the server's own accessToken.
+     * Picks the best working connection for a server, preferring
+     * local (fast LAN) → local-by-raw-IP → remote (port-forwarded) → relay
+     * (plex.tv-proxied). Returns the working URI, or null if none answer.
+     * Uses the server's own accessToken.
+     *
+     * ALL tiers are probed CONCURRENTLY and only *awaited* in preference order —
+     * mirrors pickPlexConnection in src/services/plexApi.ts. Probing used to be
+     * sequential (4s per connection, tier by tier): from the server's own network
+     * the remote probe needs NAT hairpin and often just hangs, eating the relay's
+     * budget — and a cold relay takes >4s to wake. Net effect was intermittent
+     * "couldn't reach server" during setup. The raw-IP tier survives routers whose
+     * DNS-rebind protection refuses to resolve *.plex.direct names to LAN IPs.
      */
     suspend fun pickConnection(server: PlexResourceDto): String? {
         val token = server.accessToken ?: return null
         val local  = server.connections.filter { it.local && !it.relay }
         val remote = server.connections.filter { !it.local && !it.relay }
         val relay  = server.connections.filter { it.relay }
-        return firstReachable(local, token)
-            ?: firstReachable(remote, token)
-            ?: firstReachable(relay, token)
+        val localRawIp = local
+            .filter { it.address.isNotBlank() && it.port > 0 }
+            .map { c -> "http://${if (':' in c.address) "[${c.address}]" else c.address}:${c.port}" }
+        return coroutineScope {
+            val tiers = listOf(
+                async { firstReachable(local.map { it.uri }, token, PROBE_TIMEOUT_MS) },
+                async { firstReachable(localRawIp, token, PROBE_TIMEOUT_MS) },
+                async { firstReachable(remote.map { it.uri }, token, PROBE_TIMEOUT_MS) },
+                async { firstReachable(relay.map { it.uri }, token, RELAY_TIMEOUT_MS) },
+            )
+            var chosen: String? = null
+            for (tier in tiers) {
+                chosen = tier.await()
+                if (chosen != null) break
+            }
+            coroutineContext.cancelChildren() // stop still-running lower tiers
+            android.util.Log.i("PlexRepo", "pickConnection ${server.name}: ${chosen ?: "NONE"}")
+            chosen
+        }
     }
 
-    private suspend fun firstReachable(conns: List<PlexConnectionDto>, token: String): String? {
-        for (c in conns) {
-            if (c.uri.isBlank()) continue
-            val ok = withTimeoutOrNull(4_000) {
-                runCatching { verifyServer(c.uri, token) }.isSuccess
-            } ?: false
-            if (ok) return c.uri.trimEnd('/')
+    /** Races every uri in a tier; resolves to the first that answers `/identity`, else null. */
+    private suspend fun firstReachable(uris: List<String>, token: String, timeoutMs: Long): String? {
+        val candidates = uris.filter { it.isNotBlank() }.map { it.trimEnd('/') }.distinct()
+        if (candidates.isEmpty()) return null
+        return coroutineScope {
+            val winner = CompletableDeferred<String?>()
+            val probes = candidates.map { uri ->
+                launch { if (probeIdentity(uri, token, timeoutMs)) winner.complete(uri) }
+            }
+            launch {
+                probes.joinAll()
+                winner.complete(null) // every probe failed
+            }
+            val result = winner.await()
+            coroutineContext.cancelChildren() // abort losing probes immediately
+            result
         }
-        return null
     }
+
+    /**
+     * One cancellable `/identity` probe. Uses OkHttp's async API so a cancelled
+     * coroutine aborts the socket right away — a blocking execute() would keep the
+     * tier's scope alive until its own timeout even after a winner was found — and
+     * callTimeout so a black-holed connect (e.g. NAT hairpin) can't hang past budget.
+     */
+    private suspend fun probeIdentity(uri: String, token: String, timeoutMs: Long): Boolean =
+        suspendCancellableCoroutine { cont ->
+            val call = runCatching {
+                okHttp.newBuilder()
+                    .callTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                    .build()
+                    .newCall(
+                        Request.Builder()
+                            .url("$uri/identity")
+                            .apply { plexHeaders(token).forEach { (n, v) -> header(n, v) } }
+                            .get()
+                            .build(),
+                    )
+            }.getOrElse {
+                cont.resume(false)
+                return@suspendCancellableCoroutine
+            }
+            cont.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    android.util.Log.w("PlexRepo", "probe $uri unreachable: ${e.message}")
+                    if (cont.isActive) runCatching { cont.resume(false) }
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    val ok = response.use { it.isSuccessful }
+                    android.util.Log.i("PlexRepo", "probe $uri reachable=$ok")
+                    if (cont.isActive) runCatching { cont.resume(ok) }
+                }
+            })
+        }
 
     /**
      * Fetches the HLS manifest URL once to prime the Plex transcode session before

@@ -47,14 +47,25 @@ async fn get_ws_port() -> u16 {
 /// few public APIs, so we can't use a strict allow-list. We do reject non-HTTP(S)
 /// schemes and link-local addresses (169.254.0.0/16 / fe80::/10) — the latter
 /// covers the cloud-metadata endpoint (169.254.169.254), a classic SSRF target.
+/// Plex-owned infrastructure that must stay reachable even when the allow-list is
+/// set: plex.tv drives sign-in (PIN create/poll) and server discovery, and every
+/// server connection candidate is a *.plex.direct URI. Blocking these bricked
+/// re-login on desktop — after sign-out the allow-list still held the OLD server
+/// URL, so PIN/resources/probe requests were all rejected until an app restart.
+fn is_plex_infra_host(host: &str) -> bool {
+    host == "plex.tv" || host.ends_with(".plex.tv") || host.ends_with(".plex.direct")
+}
+
 fn guard_proxy_url(url: &str, state: &tauri::State<'_, SecurityState>) -> Result<(), String> {
     let parsed = reqwest::Url::parse(url).map_err(|e| format!("invalid url: {e}"))?;
     if !matches!(parsed.scheme(), "http" | "https") {
         return Err(format!("blocked url scheme: {}", parsed.scheme()));
     }
-    
+
+    let plex_infra = parsed.host_str().map_or(false, is_plex_infra_host);
+
     let allowed = state.allowed_hosts.lock().unwrap().clone();
-    if !allowed.is_empty() {
+    if !allowed.is_empty() && !plex_infra {
         let mut matched = false;
         for host_str in allowed {
             if url.starts_with(&host_str) {

@@ -391,32 +391,60 @@ export function isWebUnreachableLanOnly(server: PlexServer): boolean {
   );
 }
 
+// A cold plex.tv relay tunnel routinely takes >4s to wake on the first request,
+// then answers instantly on the next try — which read as "login randomly fails,
+// retry works". Give relay its own, longer budget.
+const RELAY_TIMEOUT_MS = 15000;
+
 /**
- * Picks the best working connection for a server: local first (fast LAN), then
- * remote (direct/port-forwarded), then relay (plex.tv-proxied — works anywhere).
- * Returns the reachable uri, or null if the server can't be reached at all.
+ * Picks the best working connection for a server, preferring
+ * local > local-by-raw-IP (desktop) > remote > relay.
  *
- * On the WEB, a public origin (butu.fr) cannot `fetch()` a LAN address — Chrome's
- * Private Network Access blocks public→private, so a `local` connection is not just
- * slow but *impossible* and only spams "access the local address space" errors while
- * burning the probe budget. So skip local on web and go straight to remote/relay,
- * which are public and reachable from anywhere. The desktop app has no such limit.
+ * ALL tiers are probed CONCURRENTLY and only *awaited* in preference order.
+ * They used to run sequentially, so a hanging tier ate the next tier's budget:
+ * from the server's own network the remote (public-IP) probe needs NAT hairpin
+ * and often just times out, leaving the slow-to-wake relay a budget it couldn't
+ * meet → "couldn't reach server" on one attempt, success on the retry.
+ *
+ * The desktop tier also probes plain `http://<ip>:<port>` for local connections:
+ * local `*.plex.direct` names resolve to a LAN IP, which routers with DNS-rebind
+ * protection refuse to resolve — even when the server is this same machine. The
+ * raw-IP fallback goes through the Rust proxy, so no CORS/mixed-content limits.
+ * On the web that fallback is impossible (https page can't fetch http), and LAN
+ * probes in general may be blocked by Chrome's Private Network Access — they're
+ * still attempted (they fail fast), but no longer delay remote/relay.
  */
-export async function pickPlexConnection(server: PlexServer, timeoutMs = 4000): Promise<string | null> {
+export async function pickPlexConnection(server: PlexServer, timeoutMs = 5000): Promise<string | null> {
   const onWeb  = !isTauriRuntime();
   const local  = server.connections.filter((c) => c.local && !c.relay);
   const remote = server.connections.filter((c) => !c.local && !c.relay);
   const relay  = server.connections.filter((c) => c.relay);
+  const localRawIp = onWeb
+    ? []
+    : local.map((c) => ({
+        ...c,
+        uri: `http://${c.address.includes(":") ? `[${c.address}]` : c.address}:${c.port}`,
+      }));
   console.info(
     `[butu:conn] ${server.name} (web=${onWeb}) connections:`,
     server.connections.map(
       (c) => `${c.uri} [${c.local ? "local" : c.relay ? "relay" : "remote"}]`,
     ),
   );
-  const chosen =
-    (await raceReachable(local, server.accessToken, timeoutMs)) ??
-    (await raceReachable(remote, server.accessToken, timeoutMs)) ??
-    (await raceReachable(relay, server.accessToken, timeoutMs));
+  const token = server.accessToken;
+  const tiers = [
+    raceReachable(local, token, timeoutMs),
+    raceReachable(localRawIp, token, timeoutMs),
+    raceReachable(remote, token, timeoutMs),
+    raceReachable(relay, token, RELAY_TIMEOUT_MS),
+  ];
+  // Await in preference order but return on the first hit — lower tiers keep
+  // probing in the background and are simply ignored.
+  let chosen: string | null = null;
+  for (const tier of tiers) {
+    chosen = await tier;
+    if (chosen) break;
+  }
   console.info(`[butu:conn] ${server.name} chosen: ${chosen ?? "NONE"}`);
   return chosen;
 }

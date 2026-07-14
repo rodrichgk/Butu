@@ -185,7 +185,10 @@ export default function App() {
     const hosts: string[] = [];
     if (plexConfig?.serverUrl) hosts.push(plexConfig.serverUrl);
     if (jellyfinConfig?.serverUrl) hosts.push(jellyfinConfig.serverUrl);
-    if (hosts.length > 0 && isTauri()) {
+    // Push even when empty: signing out must CLEAR the Rust-side allow-list.
+    // Skipping the call left the old server URL in place, and the SSRF guard
+    // then rejected every re-login request until the app was restarted.
+    if (isTauri()) {
       import("./services/tauri").then(({ invoke }) => {
         invoke("set_allowed_hosts", { hosts }).catch(console.error);
       });
