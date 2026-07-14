@@ -46,12 +46,15 @@ jobs:
       # "Is it safe?" note in the README.
       - name: Build Tauri bundles
         run: npm run tauri build
+      # The repo is a Cargo workspace (src-tauri + crates/*), so cargo writes to the
+      # workspace-root target/, NOT src-tauri/target/ — stale globs here made the
+      # publish step silently upload nothing ("does not include a valid file").
       - name: Publish installers to the release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/msi/*.msi
+            target/release/bundle/nsis/*.exe
+            target/release/bundle/msi/*.msi
 
   android:
     name: Android APK (native)
