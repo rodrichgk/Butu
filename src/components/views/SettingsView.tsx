@@ -234,6 +234,7 @@ export default function SettingsView() {
   const { platform } = usePlatformBridge();
   const isDesktopApp = platform === PlatformContext.DesktopTauri;
 
+  const isDemo = serverType === "demo";
   const active = serverType === "plex" ? plexConfig : serverType === "jellyfin" ? jellyfinConfig : null;
   const serverLabel = serverType === "plex" ? "PLEX" : "JELLYFIN";
 
@@ -250,14 +251,20 @@ export default function SettingsView() {
         {t("settings.title")}
       </h1>
 
-      {active && (
+      {(active || isDemo) && (
         <div className="mb-8 p-6 rounded-2xl max-w-2xl"
           style={{ background: "rgba(22,26,38,0.7)", border: "1px solid rgba(153,247,255,0.1)" }}
         >
-          <p className="font-mono-tech text-xs text-on_surface_variant mb-1">{serverLabel} SERVER</p>
-          <p className="font-display font-semibold text-on_surface" style={{ wordBreak: "break-all" }}>{active.serverUrl}</p>
+          <p className="font-mono-tech text-xs text-on_surface_variant mb-1">{isDemo ? "GUEST MODE" : `${serverLabel} SERVER`}</p>
+          {isDemo ? (
+            <p className="font-display font-semibold text-on_surface">Sample content — not your library</p>
+          ) : (
+            <p className="font-display font-semibold text-on_surface" style={{ wordBreak: "break-all" }}>{active!.serverUrl}</p>
+          )}
           <p className="font-body text-on_surface_variant text-sm mt-0.5">
-            {active.userName ? <>Signed in as <span style={{ color: "#99f7ff" }}>{active.userName}</span></> : "Connected"}
+            {isDemo
+              ? "Freely-licensed short films, so you can try Butu before connecting a real server."
+              : active!.userName ? <>Signed in as <span style={{ color: "#99f7ff" }}>{active!.userName}</span></> : "Connected"}
             {storeLibrary.length > 0 && ` · ${storeLibrary.length} items`}
           </p>
           <motion.button
@@ -267,7 +274,7 @@ export default function SettingsView() {
             whileHover={{ background: "rgba(255,80,80,0.18)" }}
             whileTap={{ scale: 0.97 }}
           >
-            Disconnect
+            {isDemo ? "Exit demo" : "Disconnect"}
           </motion.button>
         </div>
       )}
@@ -318,7 +325,7 @@ export default function SettingsView() {
           onClick={() => { clearWatchProgress(); setCleared(true); }} />
       </SettingSection>
 
-      {isDesktopApp && (
+      {isDesktopApp && !isDemo && (
         <SettingSection title={t("settings.library_tools", "LIBRARY TOOLS").toUpperCase()}>
           <SettingRow label={t("settings.organize_label", "Organize downloads")} meta="HARDLINK"
             sub={t("settings.organize_sub", "Sort a folder of downloaded TV/movies into your Plex/Jellyfin library")}
@@ -327,9 +334,11 @@ export default function SettingsView() {
       )}
 
       <SettingSection title="COMPANION">
-        <SettingRow label="Marker Auto-Detect" meta="INTROS + CREDITS"
-          sub="Fingerprint your library and contribute markers to the Butu cloud DB"
-          onClick={() => setShowMarkerDetect(true)} />
+        {!isDemo && (
+          <SettingRow label="Marker Auto-Detect" meta="INTROS + CREDITS"
+            sub="Fingerprint your library and contribute markers to the Butu cloud DB"
+            onClick={() => setShowMarkerDetect(true)} />
+        )}
         <SettingRow label="Air Mouse" meta="COMING SOON"
           sub="Gyroscopic phone remote — coming soon" />
       </SettingSection>

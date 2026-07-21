@@ -110,4 +110,6 @@ export interface PlexConfig {
   userName?: string;
 }
 
-export type ServerType = "jellyfin" | "plex";
+// "demo" is guest mode: a static, freely-licensed library (see data/demoLibrary.ts)
+// so a visitor can try Butu without a real Plex/Jellyfin server.
+export type ServerType = "jellyfin" | "plex" | "demo";

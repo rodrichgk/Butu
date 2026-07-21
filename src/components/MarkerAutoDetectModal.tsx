@@ -48,7 +48,12 @@ const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY as st
 export function MarkerAutoDetectModal({ onClose }: Props) {
   const plexConfig = useConfigStore((s) => s.plexConfig);
   const jellyfinConfig = useConfigStore((s) => s.jellyfinConfig);
-  const serverType = useConfigStore((s) => s.serverType);
+  const rawServerType = useConfigStore((s) => s.serverType);
+  // This modal is only ever opened from a Plex/Jellyfin-only settings row (hidden
+  // entirely in guest mode) — narrow "demo" to null so it lines up with what
+  // fetchShowSeasons/buildShowInputs accept, and falls back to their existing
+  // "no configured server" no-op path if it were ever reached anyway.
+  const serverType = rawServerType === "demo" ? null : rawServerType;
   const { data: library = [] } = useLibraryQuery();
   const { t } = useTranslation();
 

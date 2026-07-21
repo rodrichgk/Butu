@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useConfigStore } from "../store/useConfigStore";
 import { fetchJellyfinLibrary, rawToMediaItem } from "../services/jellyfinApi";
 import { fetchPlexSections, fetchPlexSection, plexRawToMediaItem } from "../services/plexApi";
+import { demoLibrary } from "../data/demoLibrary";
 import type { MediaItem } from "../types";
 import { describeServerError } from "../utils/errorMessages";
 
@@ -13,7 +14,9 @@ export function useLibraryQuery() {
   return useQuery<MediaItem[], Error>({
     queryKey: ["library", serverType, serverType === "jellyfin" ? jellyfinConfig?.serverUrl : plexConfig?.serverUrl],
     queryFn: async () => {
-      if (serverType === "jellyfin" && jellyfinConfig) {
+      if (serverType === "demo") {
+        return demoLibrary;
+      } else if (serverType === "jellyfin" && jellyfinConfig) {
         try {
           const rawItems = await fetchJellyfinLibrary(jellyfinConfig);
           return rawItems.map((r) => rawToMediaItem(r, jellyfinConfig));
@@ -40,7 +43,8 @@ export function useLibraryQuery() {
       return [];
     },
     enabled: !!serverType && (
-      (serverType === "jellyfin" && !!jellyfinConfig) || 
+      serverType === "demo" ||
+      (serverType === "jellyfin" && !!jellyfinConfig) ||
       (serverType === "plex" && !!plexConfig)
     ),
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes

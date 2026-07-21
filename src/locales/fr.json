@@ -36,6 +36,7 @@
   "landing": {
     "title": "Vos bibliothèques Plex et Jellyfin, dans un lecteur magnifique — à la maison, partout, sur tous vos écrans.",
     "cta": "Connecter votre serveur →",
+    "try_demo": "Ou essayez la démo en direct — sans compte",
     "subtitle": "Gratuit et open-source · Plex & Jellyfin · Sans création de compte",
     "how_it_works": "Comment ça marche",
     "what_you_get": "Fonctionnalités",
@@ -68,7 +69,7 @@
     "download": "Télécharger",
     "coming_soon": "À venir",
     "faq": [
-      { "q": "Dois-je avoir mon propre serveur ?", "a": "Oui. Butu lit votre bibliothèque Plex ou Jellyfin — l'appli ne fournit ni n'héberge aucun contenu." },
+      { "q": "Dois-je avoir mon propre serveur ?", "a": "Oui. Butu lit votre bibliothèque Plex ou Jellyfin — l'appli ne fournit ni n'héberge aucun contenu. La démo en direct est la seule exception : une petite bibliothèque de courts métrages sous licence libre, pour découvrir l'appli avant de connecter votre propre serveur." },
       { "q": "Est-ce gratuit ?", "a": "Entièrement gratuit, et open-source. Si c'est utile, vous pouvez soutenir le développement, mais ce n'est pas obligatoire." },
       { "q": "Mes données sont-elles en sécurité ?", "a": "Vos identifiants restent sur votre appareil et Butu communique directement avec votre serveur. Rien ne transite par nous." },
       { "q": "Windows affiche « éditeur inconnu » — est-ce un virus ?", "a": "Non. Butu est open-source et non signé (les certificats de signature coûtent cher pour un projet indépendant), donc Windows affiche cet avertissement pour tout petit développeur. Cliquez sur Informations complémentaires → Exécuter quand même. Le code source et la build publique sont sur GitHub si vous voulez vérifier." },

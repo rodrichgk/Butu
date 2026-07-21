@@ -321,6 +321,7 @@ export default function App() {
 
   const setActiveSection = useCallback((val: string) => navigate(getLocalizedPath(val === "home" ? "/my-media" : `/${val}`, location.pathname.split("/").filter(Boolean)[0] === "fr" ? "fr" : "en")), [navigate, location.pathname]);
   const serverType       = useConfigStore((s) => s.serverType);
+  const setServerType    = useConfigStore((s) => s.setServerType);
   
   // Landing → setup gate. Once a server is connected, it resets so a signed-out visitor always lands on the explainer, not straight on the form.
   useEffect(() => {
@@ -336,7 +337,9 @@ export default function App() {
   useEffect(() => {
     const connected =
       !!serverType &&
-      ((serverType === "jellyfin" && !!jellyfinConfig) || (serverType === "plex" && !!plexConfig));
+      (serverType === "demo" ||
+        (serverType === "jellyfin" && !!jellyfinConfig) ||
+        (serverType === "plex" && !!plexConfig));
     if (connected) return;
     const parts = location.pathname.split("/").filter(Boolean);
     const hasLang = parts[0] === "fr" || parts[0] === "en";
@@ -479,7 +482,10 @@ export default function App() {
         {activeSection === "connect" ? (
           <MediaSetup />
         ) : (
-          <Landing onGetStarted={() => setActiveSection("connect")} />
+          <Landing
+            onGetStarted={() => setActiveSection("connect")}
+            onTryDemo={() => setServerType("demo")}
+          />
         )}
       </Suspense>
     );

@@ -36,6 +36,7 @@
   "landing": {
     "title": "Your Plex & Jellyfin libraries, in one beautiful player — at home, anywhere, and on every screen.",
     "cta": "Connect your server →",
+    "try_demo": "Or try the live demo — no account needed",
     "subtitle": "Free & open-source · Plex & Jellyfin · No account needed",
     "how_it_works": "How it works",
     "what_you_get": "What you get",
@@ -68,7 +69,7 @@
     "download": "Download",
     "coming_soon": "Coming soon",
     "faq": [
-      { "q": "Do I need my own server?", "a": "Yes. Butu plays your existing Plex or Jellyfin library — it doesn't host or provide any content itself." },
+      { "q": "Do I need my own server?", "a": "Yes. Butu plays your existing Plex or Jellyfin library — it doesn't host or provide any content itself. The live demo is the one exception: it's a small library of freely-licensed short films, just so you can click around before connecting your own server." },
       { "q": "Is it free?", "a": "Completely free, and open-source. If it's useful you can support development, but you never have to." },
       { "q": "Is my data safe?", "a": "Your credentials stay on your device and Butu talks directly to your server. Nothing is routed through us." },
       { "q": "Windows says \"unknown publisher\" — is it a virus?", "a": "No. Butu is open-source and unsigned (signing certificates are costly for an indie project), so Windows shows that warning for any small developer. Click More info → Run anyway. The full source and the public build are on GitHub if you want to check." },

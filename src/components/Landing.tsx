@@ -20,7 +20,7 @@ function Section({ children, className = "" }: { children: ReactNode; className?
 
 const cardStyle = { background: "rgba(16,20,30,0.7)", border: "1px solid rgba(153,247,255,0.1)" } as const;
 
-export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
+export function Landing({ onGetStarted, onTryDemo }: { onGetStarted: () => void; onTryDemo: () => void }) {
   const { t } = useTranslation();
   
   const STEPS = t('landing.steps', { returnObjects: true }) as any[];
@@ -66,6 +66,13 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
           >
             {t('landing.cta')}
           </motion.button>
+          <button
+            onClick={onTryDemo}
+            className="font-body mt-4 text-sm"
+            style={{ color: "rgba(153,247,255,0.8)", textDecoration: "underline", cursor: "pointer", background: "none", border: "none" }}
+          >
+            {t('landing.try_demo')}
+          </button>
           <p className="font-mono-tech mt-4 text-xs tracking-widest uppercase" style={{ color: "rgba(224,230,240,0.4)" }}>
             {t('landing.subtitle')}
           </p>
@@ -156,6 +163,15 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
           >
             {t('landing.cta')}
           </motion.button>
+          <div>
+            <button
+              onClick={onTryDemo}
+              className="font-body mt-5 text-sm"
+              style={{ color: "rgba(153,247,255,0.8)", textDecoration: "underline", cursor: "pointer", background: "none", border: "none" }}
+            >
+              {t('landing.try_demo')}
+            </button>
+          </div>
 
           <div className="mt-16 pt-8" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
             <p className="font-body text-sm" style={{ color: "rgba(224,230,240,0.5)" }}>
