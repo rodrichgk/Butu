@@ -3,20 +3,34 @@ import type { MediaItem } from "../types";
 // ─── Guest mode / demo library ─────────────────────────────────────────────
 //
 // Real, legally-clean, freely-licensed content so a visitor can actually click
-// Play and watch something — not just look at a mocked-up grid. Everything
-// here is the Blender Foundation's "open movies", released under Creative
-// Commons Attribution (CC BY 3.0/4.0): https://www.blender.org/about/projects/
+// Play and watch something — not just look at a mocked-up grid. Every item
+// below was individually verified (curl -I) for a real 200/206 response,
+// correct content-type, and Accept-Ranges: bytes (so seeking works) before
+// being added — and every license claim in a comment was confirmed against
+// the item's own metadata (archive.org `licenseurl` / Commons `extmetadata`),
+// not assumed. No TMDB/studio key art, no scraped subtitles, nothing that
+// needs a takedown-risk judgment call.
 //
-//   - Video files are served directly from the Internet Archive
-//     (archive.org), which mirrors the Blender Foundation's official
-//     releases. Verified reachable, correct video/mp4 content-type, and
-//     Accept-Ranges: bytes (so seeking works).
-//   - Poster art comes from Wikimedia Commons (upload.wikimedia.org/.../commons/...,
-//     NOT the fair-use /wikipedia/en/ namespace), credited to the Blender
-//     Foundation and confirmed CC BY 3.0 via the file's own extmetadata.
+//   Movies   — Blender Foundation "open movies", CC BY 3.0/4.0.
+//              https://www.blender.org/about/projects/
+//   TV       — Caminandes (same Blender Foundation project), CC BY.
+//   Anime    — Pepper&Carrot motion comic by the Morevna Project, an
+//              animated adaptation of David Revoy's webcomic, CC BY-SA 3.0/4.0.
+//              https://morevnaproject.org/
+//   Manga    — Pepper&Carrot itself (the source webcomic), by David Revoy,
+//              CC BY 4.0 — confirmed directly on peppercarrot.com/en/about.
+//              No reader in this app (manga is cover+metadata only, see
+//              ContentDetailPage's `item.type !== "manga"` check), so these
+//              are just real, correctly-licensed cover art + synopses.
+//   Music    — a mix of CC-BY(-SA) netlabel musicians (Broke For Free,
+//              Jahzzar) and the Blender Foundation's own film scores
+//              (Tears of Steel OST, CC BY-ND — used unmodified, which
+//              BY-ND permits).
 //
-// No TMDB/studio key art, no scraped subtitles, nothing that needs a
-// takedown-risk judgment call — safe to show to any visitor, indefinitely.
+// Video/audio files are served directly from the Internet Archive
+// (archive.org); poster/cover art from Wikimedia Commons
+// (upload.wikimedia.org/wikipedia/commons/..., NOT the fair-use
+// /wikipedia/en/ namespace) or archive.org's own official uploads.
 
 export const demoLibrary: MediaItem[] = [
   {
@@ -160,5 +174,165 @@ export const demoLibrary: MediaItem[] = [
         streamUrl: "https://archive.org/download/CaminandesLlamigos/Caminandes_%20Llamigos-1080p.mp4",
       },
     ],
+  },
+
+  // ─── Anime ────────────────────────────────────────────────────────────────
+  // Pepper&Carrot Motion Comic — the Morevna Project's animated adaptation of
+  // David Revoy's webcomic. Episode numbers match the source webcomic
+  // chapters (3, 4, 6); not every chapter has a motion-comic adaptation, so
+  // the numbering isn't consecutive — that's accurate, not a bug.
+  {
+    id: "demo-peppercarrot-anime",
+    title: "Pepper & Carrot",
+    type: "anime",
+    thumbnail: "https://archive.org/download/peppercarrot-ep6/poster-1-h3-final-en.jpg",
+    backdropUrl: "https://archive.org/download/peppercarrot-ep6/poster-1-h3-final-en.jpg",
+    year: 2015,
+    duration: 455,
+    genre: ["Fantasy", "Comedy", "Adventure"],
+    description: "A young witch's apprentice and her cat navigate rival magicians, potion contests, and the everyday chaos of Hereva. An animated adaptation of David Revoy's webcomic, produced by the Morevna Project's open-source animation team.",
+    resolution: "1080p",
+    codec: "H.264",
+    bitrate: "4.2 Mbps",
+    season: 1,
+    episode: 6,
+    ambientColor: "#8a4a9c",
+    episodes: [
+      {
+        id: "demo-pc-3",
+        season: 1,
+        episode: 3,
+        title: "The Secret Ingredients",
+        duration: 205,
+        description: "Pepper goes to the market, learns about the upcoming Potion Contest, and searches for the secret ingredients.",
+        streamUrl: "https://archive.org/download/pepper-carrot-episode-3-the-secret-ingredients-english/79780d2c-419b-42a3-adb5-85ae2aea4d1e-1080.mp4",
+      },
+      {
+        id: "demo-pc-4",
+        season: 1,
+        episode: 4,
+        title: "Stroke of Genius",
+        duration: 215,
+        description: "Pepper's confidence takes a hit when her potion-making doesn't go as planned.",
+        streamUrl: "https://archive.org/download/pepper-carrot-episode-4-stroke-of-genius-1080p/Pepper%20%26%20Carrot%20Episode%204%3A%20Stroke%20of%20Genius%201080p.mp4",
+      },
+      {
+        id: "demo-pc-6",
+        season: 1,
+        episode: 6,
+        title: "The Potion Contest",
+        duration: 455,
+        description: "Pepper travels to Komona Island to compete in the Potion Contest against far more experienced rivals.",
+        streamUrl: "https://archive.org/download/peppercarrot-ep6/pepper-en-basic.mp4",
+      },
+    ],
+  },
+
+  // ─── Manga ─────────────────────────────────────────────────────────────────
+  // Pepper&Carrot's own source webcomic. This app has no manga reader — these
+  // are cover art + synopsis only (see ContentDetailPage's manga check),
+  // exactly like the animated adaptation above but for the original comic.
+  {
+    id: "demo-manga-ep1",
+    title: "Pepper & Carrot — The Potion of Flight",
+    type: "manga",
+    thumbnail: "https://archive.org/download/169PeppercarrotWallpapersByDavidRevoy/Episode-1_peppercarrot-wallpaper_by-David-Revoy.jpg",
+    year: 2014,
+    genre: ["Fantasy", "Comedy", "Webcomic"],
+    description: "Episode 1 of David Revoy's webcomic: Pepper brews a flying potion for a client with more urgent business than she expects. The comic that started it all — free and CC-licensed from day one.",
+    ambientColor: "#5a9c8a",
+  },
+  {
+    id: "demo-manga-ep2",
+    title: "Pepper & Carrot — Rainbow Potions",
+    type: "manga",
+    thumbnail: "https://archive.org/download/169PeppercarrotWallpapersByDavidRevoy/Episode-2_peppercarrot-wallpaper_by-David-Revoy.jpg",
+    year: 2014,
+    genre: ["Fantasy", "Comedy", "Webcomic"],
+    description: "Episode 2: the arrogant magician Braise challenges Pepper to a very public potion-making contest — and underestimates her completely.",
+    ambientColor: "#9c5a8a",
+  },
+  {
+    id: "demo-manga-ep7",
+    title: "Pepper & Carrot — The Wish",
+    type: "manga",
+    thumbnail: "https://archive.org/download/169PeppercarrotWallpapersByDavidRevoy/Episode-7_peppercarrot-wallpaper_by-David-Revoy.jpg",
+    year: 2015,
+    genre: ["Fantasy", "Comedy", "Webcomic"],
+    description: "Episode 7: a shooting star grants Carrot the cat a single wish, with predictably chaotic consequences for Pepper's household.",
+    ambientColor: "#8a9c5a",
+  },
+
+  // ─── Music ─────────────────────────────────────────────────────────────────
+  // CC-BY(-SA) netlabel musicians, plus the Blender Foundation's own film
+  // scores. Bitrates below are computed from each file's real size/duration
+  // (both taken from the file's own archive.org metadata), not invented.
+  {
+    id: "demo-music-1",
+    title: "As Colourful As Ever",
+    type: "music",
+    thumbnail: "https://archive.org/download/BrokeForFreeLayers/cover.jpg",
+    year: 2012,
+    duration: 234,
+    genre: ["Electronic", "Downtempo"],
+    description: "Opening track from \"Layers\", released under CC BY 3.0 — a staple of the Creative Commons netlabel scene.",
+    artist: "Broke For Free",
+    album: "Layers",
+    trackNumber: 1,
+    codec: "MP3",
+    bitrate: "180 kbps",
+    streamUrl: "https://archive.org/download/BrokeForFreeLayers/Broke%20For%20Free%20-%20Layers%20-%2001%20As%20Colourful%20As%20Ever.mp3",
+    ambientColor: "#3a8ca0",
+  },
+  {
+    id: "demo-music-2",
+    title: "Night Owl",
+    type: "music",
+    thumbnail: "https://archive.org/download/Directionless_EP-8295/Directionless_EP-8295.jpg",
+    year: 2011,
+    duration: 194,
+    genre: ["Electronic", "Chillhop"],
+    description: "Opening track from the \"Directionless EP\", released under CC BY 3.0.",
+    artist: "Broke For Free",
+    album: "Directionless EP",
+    trackNumber: 1,
+    codec: "MP3",
+    bitrate: "330 kbps",
+    streamUrl: "https://archive.org/download/Directionless_EP-8295/Broke_For_Free_-_01_-_Night_Owl.mp3",
+    ambientColor: "#4a7a9c",
+  },
+  {
+    id: "demo-music-3",
+    title: "Intruder",
+    type: "music",
+    thumbnail: "https://archive.org/download/Jahzzar-Bunk/cover.jpg",
+    year: 2012,
+    duration: 292,
+    genre: ["Rock", "Instrumental"],
+    description: "Opening track from \"Bunk\", released under CC BY-SA 3.0.",
+    artist: "Jahzzar",
+    album: "Bunk",
+    trackNumber: 1,
+    codec: "MP3",
+    bitrate: "200 kbps",
+    streamUrl: "https://archive.org/download/Jahzzar-Bunk/Jahzzar%20-%20Bunk%20-%2001%20Intruder.mp3",
+    ambientColor: "#9c7a4a",
+  },
+  {
+    id: "demo-music-4",
+    title: "The Dome",
+    type: "music",
+    thumbnail: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/70/Tos-poster.png/1280px-Tos-poster.png",
+    year: 2012,
+    duration: 311,
+    genre: ["Score", "Electronic"],
+    description: "From the original score for \"Tears of Steel\", the Blender Foundation's sci-fi open movie. Released under CC BY-ND 3.0.",
+    artist: "Joram Letwory",
+    album: "Tears of Steel OST",
+    trackNumber: 2,
+    codec: "MP3",
+    bitrate: "320 kbps",
+    streamUrl: "https://archive.org/download/TearsOfSteelOst/02TheDome.mp3",
+    ambientColor: "#4a5568",
   },
 ];
