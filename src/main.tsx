@@ -1,10 +1,16 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import { HashRouter, BrowserRouter } from "react-router-dom";
+import { HashRouter, BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "./i18n";
 import "./index.css";
+
+// Gabhy's personal CV/portfolio at /gabhy — a fully standalone page, mounted
+// as a sibling to the media app (not inside it). This keeps it clear of the
+// app's i18n lang-prefix redirect and serverType/Plex-Jellyfin gating, and
+// keeps it out of the main bundle (lazy) since most visitors never hit it.
+const GabhyPortfolio = lazy(() => import("./components/GabhyPortfolio").then((m) => ({ default: m.GabhyPortfolio })));
 
 // ─── Debug surface for the black-screen issue ────────────────────────────────
 // Any uncaught error or rejected promise during boot is normally invisible
@@ -51,7 +57,10 @@ try {
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
         <Router>
-          <App />
+          <Routes>
+            <Route path="/gabhy" element={<Suspense fallback={null}><GabhyPortfolio /></Suspense>} />
+            <Route path="/*" element={<App />} />
+          </Routes>
         </Router>
       </QueryClientProvider>
     </React.StrictMode>
