@@ -283,8 +283,16 @@ function CircuitBackdrop() {
 export function GabhyPortfolio() {
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = "Gabhy Rodrich KIBA — Ingénieur Électronique & Développeur Logiciel";
+    document.title = "Gabhy Rodrich KIBA — Technicien Électronique & Développeur Logiciel";
     return () => { document.title = previousTitle; };
+  }, []);
+
+  // The rest of Butu locks #root/body to a fixed-height, non-scrolling shell
+  // and hides the OS cursor for its own custom TV-style cursor — this page
+  // needs neither (see the .gabhy-scroll rules in index.css).
+  useEffect(() => {
+    document.body.classList.add("gabhy-scroll");
+    return () => document.body.classList.remove("gabhy-scroll");
   }, []);
 
   const heroRef = useRef<HTMLDivElement>(null);

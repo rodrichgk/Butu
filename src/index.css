@@ -253,3 +253,30 @@ button.mobile-nav-item:focus {
 .media-stage-item {
   /* scroll-snap removed: causes forced layout recalc on every scroll frame */
 }
+
+/* Gabhy's CV page (/gabhy) is a normal scrolling document — the rules above
+   lock #root/body to a fixed 100dvh with overflow:hidden and hide the OS
+   cursor for the rest of the app's TV-style custom-cursor UI, which broke
+   this page (invisible mouse, everything past the first screen clipped and
+   unreachable). Unlayered on purpose: @layer base always loses to a plain
+   rule regardless of specificity, so this reliably wins without !important.
+   Toggled by GabhyPortfolio.tsx on mount/unmount. */
+body.gabhy-scroll {
+  overflow: auto;
+  height: auto;
+  user-select: text;
+}
+body.gabhy-scroll #root {
+  height: auto;
+  min-height: 100dvh;
+  overflow: visible;
+}
+body.gabhy-scroll,
+body.gabhy-scroll * {
+  cursor: auto;
+}
+body.gabhy-scroll a,
+body.gabhy-scroll button,
+body.gabhy-scroll [role="button"] {
+  cursor: pointer;
+}
