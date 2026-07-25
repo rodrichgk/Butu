@@ -7,6 +7,7 @@ import dev.butu.domain.MediaType
 import retrofit2.Retrofit
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.random.Random
 
 @Singleton
 class JellyfinRepository @Inject constructor(retrofit: Retrofit) {
@@ -227,6 +228,18 @@ internal fun jellyfinImageUrl(
  *
  * `static=true` direct play (the previous behaviour) only works for h264/aac in mp4/mkv
  * containers; everything else fails on ExoPlayer with a source error.
+ *
+ * Two things this used to get wrong, found by comparing against the Plex path:
+ *  - `PlaySessionId` was fixed per item (`butu-$itemId`), identical on every track switch —
+ *    Jellyfin then had no reason to treat a switch as a new request and kept serving the
+ *    original audio/subtitle selection. Plex avoids exactly this by minting a fresh session
+ *    id per request (see `makePlexSession`); mirrored here.
+ *  - `MaxStreamingBitrate` was capped at 20 Mbps, well under what a high-bitrate 4K/remux
+ *    file needs — Jellyfin transcodes (re-encoding, visibly worse) any time the source
+ *    exceeds this ceiling, even when the codec is otherwise directly streamable. Plex's
+ *    default path (`directStream=1`) has no equivalent ceiling, which is why it looked
+ *    fine by comparison. Raised well above what any real file plausibly hits, so codec
+ *    compatibility — not an arbitrary number — is what decides remux vs. transcode.
  */
 internal fun jellyfinStreamUrl(
     cfg: JellyfinConfig,
@@ -236,15 +249,16 @@ internal fun jellyfinStreamUrl(
     boostVoices: Boolean = true,
 ): String {
     val base = cfg.serverUrl.trimEnd('/')
+    val session = "butu-$itemId-${Random.nextLong().toString(36).take(8)}"
     val params = mutableListOf(
         "api_key" to cfg.token,
         "DeviceId" to "butu-android-tv-v1",
         "MediaSourceId" to itemId,
-        "PlaySessionId" to "butu-$itemId",
+        "PlaySessionId" to session,
         "VideoCodec" to "h264,hevc",
         "AudioCodec" to "aac,mp3,ac3,eac3",
         "SubtitleMethod" to "Encode",
-        "MaxStreamingBitrate" to "20000000",
+        "MaxStreamingBitrate" to "120000000",
     )
     // "Boost voices": force a server-side stereo downmix (ffmpeg mixes the centre/dialogue
     // channel into L/R properly) instead of letting the TV fold 5.1 down and bury speech under
