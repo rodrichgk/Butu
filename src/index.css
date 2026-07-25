@@ -288,5 +288,4 @@ body.gabhy-scroll a:focus-visible,
 body.gabhy-scroll button:focus-visible {
   outline: 2px solid #99f7ff;
   outline-offset: 3px;
-  border-radius: 4px;
 }

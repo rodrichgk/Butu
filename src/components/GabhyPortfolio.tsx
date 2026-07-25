@@ -534,10 +534,14 @@ export function GabhyPortfolio() {
             inside it instead. Animating the button itself made it a moving
             target on touch: a tap landing mid-bounce could read as a
             drag/scroll rather than a tap, silently swallowing the click
-            (needed a second, luckier tap to actually navigate). */}
+            (needed a second, luckier tap to actually navigate). Sitting far
+            enough from the viewport's bottom edge (bottom-8, not bottom-4)
+            also means its focus ring never risks being clipped there —
+            Safari nudges the page to reveal a clipped focus ring, which is
+            exactly the "the button jumps when I click it" symptom this had. */}
         <button
           onClick={() => scrollToId("about")}
-          className="absolute bottom-4 flex flex-col items-center gap-1 px-5 py-3.5 rounded-full"
+          className="absolute bottom-8 flex flex-col items-center gap-1 px-5 py-3.5 rounded-full"
           style={{
             color: "rgba(224,230,240,0.6)",
             cursor: "pointer",
