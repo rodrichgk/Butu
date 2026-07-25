@@ -4,8 +4,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dev.butu.data.config.ConfigStore
-import dev.butu.data.config.ServerType
 import dev.butu.data.media.MediaRepository
 import dev.butu.data.progress.WatchProgressStore
 import dev.butu.domain.MediaType
@@ -23,7 +21,6 @@ class DetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val mediaRepository: MediaRepository,
     private val watchProgressStore: WatchProgressStore,
-    private val configStore: ConfigStore,
 ) : ViewModel() {
 
     private val itemId: String = savedStateHandle["itemId"] ?: error("itemId required")
@@ -74,11 +71,13 @@ class DetailViewModel @Inject constructor(
             episodes.value = current.episodes
             return
         }
+        // Used to also require `configStore.currentServerType() == ServerType.Plex`, which
+        // silently skipped this for every Jellyfin show — the episode list (and so playback,
+        // since there was nothing to tap) stayed empty. mediaRepository.fetchEpisodes already
+        // dispatches to the right backend on its own (see PlayerViewModel.loadSeriesEpisodes,
+        // which never had this restriction); plexShowKey is simply unused on the Jellyfin path.
+        val plexShowKey = current.plexKey
         viewModelScope.launch {
-            val plexShowKey = current.plexKey
-            val isPlexShow = configStore.currentServerType() == ServerType.Plex && plexShowKey != null
-            android.util.Log.i("DetailVM", "loadEpisodes: type=${current.type} plexKey=$plexShowKey isPlexShow=$isPlexShow")
-            if (!isPlexShow) return@launch
             episodesLoading.value = true
             runCatching { mediaRepository.fetchEpisodes(seriesId = current.id, plexShowKey = plexShowKey) }
                 .onSuccess { fetched ->
@@ -87,7 +86,7 @@ class DetailViewModel @Inject constructor(
                     if (activeSeason.value == 1) activeSeason.value = first
                 }
                 .onFailure { e ->
-                    android.util.Log.e("DetailVM", "fetchEpisodes failed for $plexShowKey: ${e.message}", e)
+                    android.util.Log.e("DetailVM", "fetchEpisodes failed for ${current.id}: ${e.message}", e)
                 }
             episodesLoading.value = false
         }
