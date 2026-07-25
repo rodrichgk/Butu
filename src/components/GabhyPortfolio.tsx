@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from 
 import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
 import {
   Cpu, CircuitBoard, Wrench, Code2, Bot, GraduationCap, Mail, MapPin,
-  Github, Linkedin, ExternalLink, ChevronDown, Radio, Layers, Rocket,
-  Car, Camera, Globe, Tv, Terminal, Sparkles, Hammer, Plane,
+  Github, ExternalLink, ChevronDown, Radio,
+  Car, Camera, Globe, Tv, Terminal, Sparkles, Hammer, Plane, Recycle, Newspaper,
 } from "lucide-react";
 
 // ─── Personal CV / portfolio — Gabhy Rodrich KIBA ──────────────────────────
@@ -16,8 +16,7 @@ import {
 // purpose — it's a proven, cohesive system, not a shortcut.
 
 const EMAIL = "kibarodrich@gmail.com";
-// TODO(Gabhy): fill in real profile URLs.
-const LINKEDIN_URL = "https://www.linkedin.com/in/gabhy-rodrich-kiba/";
+// TODO(Gabhy): fill in your real GitHub URL if this one isn't it.
 const GITHUB_URL = "https://github.com/rodrichgk";
 
 const NAV_LINKS = [
@@ -58,7 +57,7 @@ const SKILL_CATEGORIES: SkillCategory[] = [
   {
     icon: Code2,
     title: "Développement Logiciel & Web",
-    items: ["TypeScript", "Next.js / React", "Rust (Tauri)", "Kotlin (Jetpack Compose)", "Python"],
+    items: ["TypeScript", "Next.js / React", "Rust (Tauri)", "Kotlin (Jetpack Compose)", "Python", "PHP", "Symfony"],
     accent: "#8cf7c4",
   },
   {
@@ -111,6 +110,7 @@ interface Project {
   tags: string[];
   icon: typeof Cpu;
   image?: string;
+  link?: { url: string; label: string };
 }
 
 const PROJECTS: Project[] = [
@@ -148,6 +148,13 @@ const PROJECTS: Project[] = [
     tags: ["ROS", "Gazebo", "Robotique"],
     icon: Bot,
     image: "/gabhy/projects/robotics.jpg",
+  },
+  {
+    title: "Système de gobelets réutilisables — Partenariat Michelin",
+    description: "Projet mené à trois pendant le DU #ICI (IUT du Creusot), en partenariat avec le site Michelin de Blanzy : conception d'un système remplaçant les gobelets plastiques souples à usage unique des distributeurs par une solution réutilisable, avec un support lavable — en anticipation de l'interdiction du plastique à usage unique entrée en vigueur en 2021. Projet couvert par la presse locale.",
+    tags: ["Michelin", "Éco-conception", "DU #ICI"],
+    icon: Recycle,
+    link: { url: "https://www.lejsl.com/edition-le-creusot/2020/01/28/pour-le-recyclage-des-gobelets-plastiques-dans-les-entreprises", label: "Article — Le Journal de Saône-et-Loire" },
   },
   {
     title: "Kellefabrik.org — FabLab de Dijon",
@@ -523,16 +530,30 @@ export function GabhyPortfolio() {
           </motion.div>
         </motion.div>
 
-        <motion.button
+        {/* A plain, non-animating <button> — the bounce lives on the span
+            inside it instead. Animating the button itself made it a moving
+            target on touch: a tap landing mid-bounce could read as a
+            drag/scroll rather than a tap, silently swallowing the click
+            (needed a second, luckier tap to actually navigate). */}
+        <button
           onClick={() => scrollToId("about")}
-          className="absolute bottom-6 flex flex-col items-center gap-1.5 px-4 py-3"
-          style={{ color: "rgba(224,230,240,0.5)", cursor: "pointer", background: "none", border: "none" }}
-          animate={reducedMotion ? undefined : { y: [0, 8, 0] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute bottom-4 flex flex-col items-center gap-1 px-5 py-3.5 rounded-full"
+          style={{
+            color: "rgba(224,230,240,0.6)",
+            cursor: "pointer",
+            background: "rgba(153,247,255,0.05)",
+            border: "1px solid rgba(153,247,255,0.12)",
+          }}
         >
-          <span className="font-mono-tech text-[10px] tracking-widest uppercase">Découvrir</span>
-          <ChevronDown size={18} />
-        </motion.button>
+          <motion.span
+            className="flex flex-col items-center gap-1"
+            animate={reducedMotion ? undefined : { y: [0, 6, 0] }}
+            transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <span className="font-mono-tech text-[11px] tracking-widest uppercase">Découvrir</span>
+            <ChevronDown size={20} />
+          </motion.span>
+        </button>
       </section>
 
       {/* ── ABOUT ── */}
@@ -673,6 +694,19 @@ export function GabhyPortfolio() {
                           </span>
                         ))}
                       </div>
+                      {project.link && (
+                        <a
+                          href={project.link.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-2 font-body text-xs mt-4 pt-4"
+                          style={{ color: "#5fd6e8", borderTop: "1px solid rgba(153,247,255,0.1)" }}
+                        >
+                          <Newspaper size={14} />
+                          <span className="flex-1">{project.link.label}</span>
+                          <ExternalLink size={12} style={{ opacity: 0.6 }} />
+                        </a>
+                      )}
                     </div>
                   </motion.div>
                 </Reveal>
@@ -745,7 +779,6 @@ export function GabhyPortfolio() {
           <Reveal delay={0.24}>
             <div className="flex flex-wrap items-center justify-center gap-4">
               <SocialLink href={GITHUB_URL} label="GitHub" icon={Github} />
-              <SocialLink href={LINKEDIN_URL} label="LinkedIn" icon={Linkedin} />
             </div>
           </Reveal>
         </div>
