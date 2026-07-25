@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from 
 import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
 import {
   Cpu, CircuitBoard, Wrench, Code2, Bot, GraduationCap, Mail, MapPin,
-  Github, ExternalLink, ChevronDown, Radio,
+  Github, ExternalLink, Radio,
   Car, Camera, Globe, Tv, Terminal, Sparkles, Hammer, Plane, Recycle, Newspaper,
 } from "lucide-react";
 
@@ -530,34 +530,6 @@ export function GabhyPortfolio() {
           </motion.div>
         </motion.div>
 
-        {/* A plain, non-animating <button> — the bounce lives on the span
-            inside it instead. Animating the button itself made it a moving
-            target on touch: a tap landing mid-bounce could read as a
-            drag/scroll rather than a tap, silently swallowing the click
-            (needed a second, luckier tap to actually navigate). Sitting far
-            enough from the viewport's bottom edge (bottom-8, not bottom-4)
-            also means its focus ring never risks being clipped there —
-            Safari nudges the page to reveal a clipped focus ring, which is
-            exactly the "the button jumps when I click it" symptom this had. */}
-        <button
-          onClick={() => scrollToId("about")}
-          className="absolute bottom-8 flex flex-col items-center gap-1 px-5 py-3.5 rounded-full"
-          style={{
-            color: "rgba(224,230,240,0.6)",
-            cursor: "pointer",
-            background: "rgba(153,247,255,0.05)",
-            border: "1px solid rgba(153,247,255,0.12)",
-          }}
-        >
-          <motion.span
-            className="flex flex-col items-center gap-1"
-            animate={reducedMotion ? undefined : { y: [0, 6, 0] }}
-            transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-          >
-            <span className="font-mono-tech text-[11px] tracking-widest uppercase">Découvrir</span>
-            <ChevronDown size={20} />
-          </motion.span>
-        </button>
       </section>
 
       {/* ── ABOUT ── */}
