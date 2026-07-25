@@ -280,3 +280,13 @@ body.gabhy-scroll button,
 body.gabhy-scroll [role="button"] {
   cursor: pointer;
 }
+/* `*:focus { outline: none; }` above is app-wide (the main app replaces it
+   with its own `.focusable` neon-glow system) — this page's buttons/links
+   aren't marked `.focusable`, so without this override keyboard users get
+   zero focus indicator anywhere. :focus-visible keeps mouse clicks clean. */
+body.gabhy-scroll a:focus-visible,
+body.gabhy-scroll button:focus-visible {
+  outline: 2px solid #99f7ff;
+  outline-offset: 3px;
+  border-radius: 4px;
+}

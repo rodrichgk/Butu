@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
 import {
   Cpu, CircuitBoard, Wrench, Code2, Bot, GraduationCap, Mail, MapPin,
   Github, Linkedin, ExternalLink, ChevronDown, Radio, Layers, Rocket,
-  Car, Camera, Globe, Tv, Terminal, Sparkles,
+  Car, Camera, Globe, Tv, Terminal, Sparkles, Hammer, Plane,
 } from "lucide-react";
 
 // ─── Personal CV / portfolio — Gabhy Rodrich KIBA ──────────────────────────
@@ -119,21 +119,21 @@ const PROJECTS: Project[] = [
     description: "Conception du banc de test matériel (hydraulique/moteurs) et développement d'une application de diagnostic universelle pour simuler les capteurs de vitesse et tester les vannes.",
     tags: ["Rust", "Tauri", "TypeScript", "Hydraulique"],
     icon: Car,
-    image: "/gabhy/projects/braxon.jpg",
+    image: "/braxon-software.png",
   },
   {
     title: "Orphelia.net",
     description: "Développement d'un site web complet en Next.js et TypeScript.",
     tags: ["Next.js", "TypeScript", "Web"],
     icon: Globe,
-    image: "/gabhy/projects/orphelia.jpg",
+    image: "/orphelia.net.png",
   },
   {
     title: "Client Média « Butu »",
     description: "Application client Android TV pour Jellyfin/Plex, développée en Kotlin avec Jetpack Compose — UI et lecteur multimédia sur mesure.",
     tags: ["Kotlin", "Jetpack Compose", "Android TV"],
     icon: Tv,
-    image: "/gabhy/projects/butu.jpg",
+    image: "/butu-screenshot.png",
   },
   {
     title: "Cutefish OS — Screenshot App",
@@ -148,6 +148,19 @@ const PROJECTS: Project[] = [
     tags: ["ROS", "Gazebo", "Robotique"],
     icon: Bot,
     image: "/gabhy/projects/robotics.jpg",
+  },
+  {
+    title: "Kellefabrik.org — FabLab de Dijon",
+    description: "Adhérent du FabLab Kellefabrik à Dijon, développement de leur site web en Symfony et PHP (2023). Le site a fermé cette année suite à un changement d'administration.",
+    tags: ["Symfony", "PHP", "FabLab"],
+    icon: Hammer,
+  },
+  {
+    title: "Drone Arduino / ESP32",
+    description: "Conception et développement d'un drone à base d'Arduino et ESP32, de l'électronique de vol au firmware embarqué.",
+    tags: ["Arduino", "ESP32", "C++", "Drone"],
+    icon: Plane,
+    image: "/drone.jpg",
   },
 ];
 
@@ -169,6 +182,25 @@ const cardStyle = { background: "rgba(16,20,30,0.7)", border: "1px solid rgba(15
 
 function scrollToId(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// Real `prefers-reduced-motion` support — not `utils/platform.ts`'s
+// `reducedMotion`, which despite the name only checks isAndroid and has
+// nothing to do with this accessibility preference. Gates the page's
+// continuous/looping animations (blob pulses, glow-breathe, auto-cycling
+// role text, the bouncing scroll hint); one-shot reveal-on-scroll fades are
+// small enough to leave alone.
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = () => setReduced(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return reduced;
 }
 
 // ─── Reveal-on-scroll wrapper ───────────────────────────────────────────────
@@ -199,45 +231,64 @@ function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) 
 // The user hasn't dropped real photos into public/gabhy/ yet — rather than a
 // broken-image icon, fall back to a themed placeholder that looks intentional.
 // Swapping in the real file later needs zero code changes.
-function SmartImage({ src, alt, fallback, className, imgClassName }: {
-  src: string; alt: string; fallback: ReactNode; className?: string; imgClassName?: string;
+function SmartImage({ src, alt, fallback, className, imgClassName, style }: {
+  src?: string; alt: string; fallback: ReactNode; className?: string; imgClassName?: string; style?: CSSProperties;
 }) {
   const [failed, setFailed] = useState(false);
-  if (failed) {
-    return <div className={className}>{fallback}</div>;
+  // No src at all (e.g. a project with no available screenshot) skips the
+  // <img> entirely rather than relying on browsers' inconsistent handling of
+  // an empty src attribute to fire onError. `style` (the aspect-ratio) is
+  // applied identically in both branches so the card never lays out at zero
+  // height then jumps once the image loads.
+  if (!src || failed) {
+    return <div className={className} style={style}>{fallback}</div>;
   }
   return (
-    <div className={className}>
+    <div className={className} style={style}>
       <img src={src} alt={alt} className={imgClassName} onError={() => setFailed(true)} loading="lazy" />
     </div>
   );
 }
 
+// No fallback avatar on purpose — a "GK" letter-tile where a photo should be
+// reads as a broken/unfinished site, not a design choice. While no real
+// photo exists at /gabhy/profile.jpg this renders nothing at all (not even
+// the glow ring); once the file is added it fades in on its own, no code
+// changes needed.
 function ProfilePhoto() {
+  const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
+  const reducedMotion = usePrefersReducedMotion();
+  if (status === "error") return null;
   return (
-    <SmartImage
-      src="/gabhy/profile.jpg"
-      alt="Portrait de Gabhy Rodrich KIBA"
-      className="relative shrink-0 rounded-full overflow-hidden"
-      imgClassName="w-full h-full object-cover"
-      fallback={
-        <div className="w-full h-full flex items-center justify-center font-display font-black" style={{
-          background: "linear-gradient(135deg, rgba(153,247,255,0.18), rgba(153,247,255,0.04))",
-          color: "#99f7ff", fontSize: "clamp(2.5rem, 6vw, 3.5rem)",
-        }}>
-          GK
-        </div>
-      }
-    />
+    <motion.div
+      className="relative w-28 h-28 md:w-36 md:h-36 mb-7"
+      initial={{ opacity: 0, scale: 0.85 }}
+      animate={{ opacity: status === "loaded" ? 1 : 0, scale: status === "loaded" ? 1 : 0.85 }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      style={{ pointerEvents: status === "loaded" ? undefined : "none" }}
+    >
+      <div className={`absolute -inset-2 rounded-full ${reducedMotion ? "" : "animate-glow-breathe"}`} style={{ border: "1px solid rgba(153,247,255,0.25)" }} />
+      <div className="relative w-full h-full rounded-full overflow-hidden">
+        <img
+          src="/gabhy/profile.jpg"
+          alt="Portrait de Gabhy Rodrich KIBA"
+          className="w-full h-full object-cover"
+          onLoad={() => setStatus("loaded")}
+          onError={() => setStatus("error")}
+        />
+      </div>
+    </motion.div>
   );
 }
 
 function RoleCycler() {
   const [idx, setIdx] = useState(0);
+  const reducedMotion = usePrefersReducedMotion();
   useEffect(() => {
+    if (reducedMotion) return; // idx stays 0 — shows the first role, static
     const t = setInterval(() => setIdx((i) => (i + 1) % ROLES.length), 2800);
     return () => clearInterval(t);
-  }, []);
+  }, [reducedMotion]);
   return (
     <div className="h-7 md:h-8 flex items-center justify-center overflow-hidden">
       <AnimatePresence mode="wait">
@@ -307,66 +358,92 @@ export function GabhyPortfolio() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const reducedMotion = usePrefersReducedMotion();
+
   return (
     <div style={{ background: "#04060d", color: "#e0e6f0", minHeight: "100vh" }}>
-      {/* ── Top nav ── */}
+      {/* ── Top nav ──
+          Nav links only show from `lg:` up — at `md` (tablet/iPad-portrait,
+          768px) six French labels + logo + CTA button don't actually fit the
+          available width and would overflow/wrap. Below `lg:` a horizontally
+          scrollable pill row takes over instead (also used on phones). */}
       <motion.nav
         className="fixed top-0 inset-x-0 z-40 transition-colors duration-300"
         style={{
           background: navSolid ? "rgba(4,6,13,0.85)" : "transparent",
           backdropFilter: navSolid ? "blur(16px)" : "none",
-          borderBottom: navSolid ? "1px solid rgba(153,247,255,0.1)" : "1px solid transparent",
+          paddingTop: "env(safe-area-inset-top)",
         }}
         initial={{ y: -60 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       >
-        <div className="mx-auto flex items-center justify-between px-5 sm:px-8 py-3.5" style={{ maxWidth: 1180 }}>
+        {/* Faint always-on accent line instead of a flat border — reads as a
+            powered-on circuit trace rather than a stock nav divider. */}
+        <div className="absolute bottom-0 inset-x-0 h-px" style={{
+          background: "linear-gradient(90deg, transparent, rgba(153,247,255,0.35) 20%, rgba(153,247,255,0.35) 80%, transparent)",
+          opacity: navSolid ? 1 : 0.4,
+          transition: "opacity 0.3s",
+        }} />
+
+        <div className="mx-auto flex items-center justify-between px-4 sm:px-8 py-3.5" style={{ maxWidth: 1180 }}>
           <button
             onClick={() => scrollToId("hero")}
-            className="flex items-center gap-2.5 font-display font-black text-sm tracking-wide"
+            className="flex items-center gap-2.5 font-display font-black text-sm tracking-wide shrink-0"
             style={{ color: "#e0e6f0", cursor: "pointer", background: "none", border: "none" }}
           >
-            <span className="flex items-center justify-center w-8 h-8 rounded-lg" style={{
+            <span className="relative flex items-center justify-center w-8 h-8" style={{
               background: "linear-gradient(135deg, rgba(153,247,255,0.2), rgba(153,247,255,0.05))",
               border: "1px solid rgba(153,247,255,0.3)", color: "#99f7ff",
+              clipPath: "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)",
             }}>
-              <Terminal size={16} />
+              <Terminal size={15} />
             </span>
             GRK
+            <span className={`w-1.5 h-1.5 rounded-full ${reducedMotion ? "" : "animate-glow-breathe"}`} style={{ background: "#8cf7c4" }} />
           </button>
 
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden lg:flex items-center gap-1">
             {NAV_LINKS.map((l) => (
               <button
                 key={l.id}
                 onClick={() => scrollToId(l.id)}
-                className="font-body text-sm px-3.5 py-2 rounded-lg transition-colors"
+                className="group relative font-body text-sm px-3.5 py-2.5"
                 style={{ color: "rgba(224,230,240,0.65)", cursor: "pointer", background: "none", border: "none" }}
                 onMouseEnter={(e) => (e.currentTarget.style.color = "#99f7ff")}
                 onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(224,230,240,0.65)")}
               >
                 {l.label}
+                <span
+                  className="absolute left-3.5 right-3.5 bottom-1.5 h-px origin-left scale-x-0 transition-transform duration-300 group-hover:scale-x-100"
+                  style={{ background: "#99f7ff" }}
+                />
               </button>
             ))}
           </div>
 
           <a
             href={`mailto:${EMAIL}`}
-            className="font-display font-semibold text-xs sm:text-sm px-3.5 sm:px-4 py-2 rounded-xl whitespace-nowrap"
+            className="font-display font-semibold text-xs sm:text-sm px-3.5 sm:px-4 py-2.5 rounded-xl whitespace-nowrap shrink-0"
             style={{ background: "linear-gradient(135deg,#99f7ff,#00f1fe)", color: "#001f24" }}
           >
             Me contacter
           </a>
         </div>
-        {/* Mobile anchor row */}
-        <div className="md:hidden flex gap-4 overflow-x-auto px-5 pb-3 -mt-1" style={{ scrollbarWidth: "none" }}>
+        {/* Tablet + phone anchor row — real pill buttons (not bare text) so
+            each one is a comfortable tap target, not just a thin text line. */}
+        <div className="lg:hidden flex gap-2 overflow-x-auto px-4 pb-3 -mt-0.5" style={{ scrollbarWidth: "none" }}>
           {NAV_LINKS.map((l) => (
             <button
               key={l.id}
               onClick={() => scrollToId(l.id)}
-              className="font-mono-tech text-[11px] tracking-widest uppercase whitespace-nowrap"
-              style={{ color: "rgba(224,230,240,0.5)", cursor: "pointer", background: "none", border: "none" }}
+              className="font-mono-tech text-[11px] tracking-widest uppercase whitespace-nowrap px-3.5 py-2.5 rounded-full shrink-0"
+              style={{
+                color: "rgba(224,230,240,0.6)",
+                background: "rgba(153,247,255,0.05)",
+                border: "1px solid rgba(153,247,255,0.12)",
+                cursor: "pointer",
+              }}
             >
               {l.label}
             </button>
@@ -381,26 +458,18 @@ export function GabhyPortfolio() {
         <motion.div
           className="pointer-events-none absolute rounded-full"
           style={{ width: 480, height: 480, top: "10%", left: "-10%", background: "radial-gradient(circle, rgba(153,247,255,0.12) 0%, transparent 70%)", filter: "blur(40px)" }}
-          animate={{ scale: [1, 1.15, 1], opacity: [0.6, 1, 0.6] }}
+          animate={reducedMotion ? undefined : { scale: [1, 1.15, 1], opacity: [0.6, 1, 0.6] }}
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
         />
         <motion.div
           className="pointer-events-none absolute rounded-full"
           style={{ width: 420, height: 420, bottom: "5%", right: "-8%", background: "radial-gradient(circle, rgba(140,247,196,0.10) 0%, transparent 70%)", filter: "blur(40px)" }}
-          animate={{ scale: [1.1, 1, 1.1], opacity: [0.5, 0.9, 0.5] }}
+          animate={reducedMotion ? undefined : { scale: [1.1, 1, 1.1], opacity: [0.5, 0.9, 0.5] }}
           transition={{ duration: 9, repeat: Infinity, ease: "easeInOut", delay: 1 }}
         />
 
         <motion.div style={{ opacity: heroOpacity, y: heroY }} className="relative flex flex-col items-center">
-          <motion.div
-            className="relative w-28 h-28 md:w-36 md:h-36 mb-7"
-            initial={{ opacity: 0, scale: 0.85 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          >
-            <div className="absolute -inset-2 rounded-full animate-glow-breathe" style={{ border: "1px solid rgba(153,247,255,0.25)" }} />
-            <ProfilePhoto />
-          </motion.div>
+          <ProfilePhoto />
 
           <motion.p
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.15 }}
@@ -433,7 +502,7 @@ export function GabhyPortfolio() {
 
           <motion.div
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.55 }}
-            className="flex flex-col sm:flex-row items-center gap-3.5 mt-9 w-full sm:w-auto px-5 sm:px-0"
+            className="flex flex-col sm:flex-row items-center gap-3.5 mt-9 w-full sm:w-auto"
           >
             <motion.button
               onClick={() => scrollToId("projects")}
@@ -456,9 +525,9 @@ export function GabhyPortfolio() {
 
         <motion.button
           onClick={() => scrollToId("about")}
-          className="absolute bottom-8 flex flex-col items-center gap-1.5"
-          style={{ color: "rgba(224,230,240,0.4)", cursor: "pointer", background: "none", border: "none" }}
-          animate={{ y: [0, 8, 0] }}
+          className="absolute bottom-6 flex flex-col items-center gap-1.5 px-4 py-3"
+          style={{ color: "rgba(224,230,240,0.5)", cursor: "pointer", background: "none", border: "none" }}
+          animate={reducedMotion ? undefined : { y: [0, 8, 0] }}
           transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
         >
           <span className="font-mono-tech text-[10px] tracking-widest uppercase">Découvrir</span>
@@ -467,13 +536,13 @@ export function GabhyPortfolio() {
       </section>
 
       {/* ── ABOUT ── */}
-      <section id="about" className="relative px-5 sm:px-8 py-20 md:py-28">
+      <section id="about" className="relative px-5 sm:px-8 py-20 md:py-28 scroll-mt-24 lg:scroll-mt-18">
         <div className="mx-auto" style={{ maxWidth: 900 }}>
           <SectionHeading eyebrow="Qui suis-je" title="À propos" />
           <Reveal delay={0.1}>
             <div className="rounded-3xl p-8 md:p-10" style={cardStyle}>
               <p className="font-body" style={{ fontSize: "clamp(1.05rem, 2.2vw, 1.2rem)", color: "rgba(224,230,240,0.8)", lineHeight: 1.75 }}>
-                Basé à <span style={{ color: "#99f7ff" }}>Marseille</span>, technicien polyvalent de 24 ans.
+                Basé à <span style={{ color: "#99f7ff" }}>Marseille</span>, technicien polyvalent de 25 ans.
                 J'allie une forte expertise en <strong style={{ color: "#e0e6f0" }}>ingénierie matérielle</strong> (réparation,
                 rétro-ingénierie, conception de PCB) avec des compétences avancées en{" "}
                 <strong style={{ color: "#e0e6f0" }}>développement logiciel moderne</strong>. Que ce soit pour prototyper
@@ -481,7 +550,7 @@ export function GabhyPortfolio() {
                 j'aime construire des solutions de A à Z.
               </p>
               <div className="flex flex-wrap gap-3 mt-7">
-                {["24 ans", "Marseille (13005)", "Hardware + Software"].map((tag) => (
+                {["25 ans", "Marseille (13005)", "Hardware + Software"].map((tag) => (
                   <span key={tag} className="font-mono-tech text-xs tracking-wide px-3.5 py-1.5 rounded-full" style={{ background: "rgba(153,247,255,0.08)", color: "#5fd6e8", border: "1px solid rgba(153,247,255,0.15)" }}>
                     {tag}
                   </span>
@@ -493,7 +562,7 @@ export function GabhyPortfolio() {
       </section>
 
       {/* ── SKILLS ── */}
-      <section id="skills" className="relative px-5 sm:px-8 py-20 md:py-28" style={{ background: "rgba(153,247,255,0.02)" }}>
+      <section id="skills" className="relative px-5 sm:px-8 py-20 md:py-28 scroll-mt-24 lg:scroll-mt-18" style={{ background: "rgba(153,247,255,0.02)" }}>
         <div className="mx-auto" style={{ maxWidth: 1180 }}>
           <SectionHeading eyebrow="Boîte à outils" title="Compétences" />
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -523,7 +592,7 @@ export function GabhyPortfolio() {
       </section>
 
       {/* ── EXPERIENCE ── */}
-      <section id="experience" className="relative px-5 sm:px-8 py-20 md:py-28">
+      <section id="experience" className="relative px-5 sm:px-8 py-20 md:py-28 scroll-mt-24 lg:scroll-mt-18">
         <div className="mx-auto" style={{ maxWidth: 820 }}>
           <SectionHeading eyebrow="Parcours" title="Expériences professionnelles" />
           <div className="relative">
@@ -568,7 +637,7 @@ export function GabhyPortfolio() {
       </section>
 
       {/* ── PROJECTS ── */}
-      <section id="projects" className="relative px-5 sm:px-8 py-20 md:py-28" style={{ background: "rgba(153,247,255,0.02)" }}>
+      <section id="projects" className="relative px-5 sm:px-8 py-20 md:py-28 scroll-mt-24 lg:scroll-mt-18" style={{ background: "rgba(153,247,255,0.02)" }}>
         <div className="mx-auto" style={{ maxWidth: 1180 }}>
           <SectionHeading eyebrow="Réalisations" title="Projets phares" />
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -583,12 +652,13 @@ export function GabhyPortfolio() {
                     transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                   >
                     <SmartImage
-                      src={project.image ?? ""}
+                      src={project.image}
                       alt={project.title}
                       className="relative w-full overflow-hidden"
+                      style={{ aspectRatio: "16/10" }}
                       imgClassName="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       fallback={
-                        <div className="w-full flex items-center justify-center" style={{ aspectRatio: "16/10", background: "linear-gradient(135deg, rgba(153,247,255,0.08), rgba(153,247,255,0.02))" }}>
+                        <div className="w-full h-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(153,247,255,0.08), rgba(153,247,255,0.02))" }}>
                           <Icon size={40} color="#5fd6e8" strokeWidth={1.4} />
                         </div>
                       }
@@ -613,7 +683,7 @@ export function GabhyPortfolio() {
       </section>
 
       {/* ── EDUCATION ── */}
-      <section id="education" className="relative px-5 sm:px-8 py-20 md:py-28">
+      <section id="education" className="relative px-5 sm:px-8 py-20 md:py-28 scroll-mt-24 lg:scroll-mt-18">
         <div className="mx-auto" style={{ maxWidth: 820 }}>
           <SectionHeading eyebrow="Diplômes" title="Formation" />
           <div className="flex flex-col gap-3.5">
@@ -636,7 +706,7 @@ export function GabhyPortfolio() {
       </section>
 
       {/* ── CONTACT ── */}
-      <section id="contact" className="relative px-5 sm:px-8 py-20 md:py-32 overflow-hidden">
+      <section id="contact" className="relative px-5 sm:px-8 py-20 md:py-32 overflow-hidden scroll-mt-24 lg:scroll-mt-18">
         <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(ellipse 60% 50% at 50% 50%, rgba(153,247,255,0.08) 0%, transparent 70%)" }} />
         <div className="relative mx-auto text-center" style={{ maxWidth: 640 }}>
           <Reveal>
@@ -673,7 +743,7 @@ export function GabhyPortfolio() {
           </Reveal>
 
           <Reveal delay={0.24}>
-            <div className="flex items-center justify-center gap-4">
+            <div className="flex flex-wrap items-center justify-center gap-4">
               <SocialLink href={GITHUB_URL} label="GitHub" icon={Github} />
               <SocialLink href={LINKEDIN_URL} label="LinkedIn" icon={Linkedin} />
             </div>
@@ -681,7 +751,7 @@ export function GabhyPortfolio() {
         </div>
       </section>
 
-      <footer className="px-5 py-8 text-center">
+      <footer className="px-5 py-8 text-center" style={{ paddingBottom: "max(2rem, env(safe-area-inset-bottom))" }}>
         <p className="font-mono-tech text-xs" style={{ color: "rgba(224,230,240,0.25)" }}>
           Gabhy Rodrich KIBA · {new Date().getFullYear()}
         </p>
