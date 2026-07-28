@@ -104,13 +104,19 @@ const EXPERIENCE: Experience[] = [
   },
 ];
 
+interface ProjectLink {
+  url: string;
+  label: string;
+  kind: "github" | "article";
+}
+
 interface Project {
   title: string;
   description: string;
   tags: string[];
   icon: typeof Cpu;
   image?: string;
-  link?: { url: string; label: string };
+  links?: ProjectLink[];
 }
 
 const PROJECTS: Project[] = [
@@ -120,6 +126,10 @@ const PROJECTS: Project[] = [
     tags: ["Rust", "Tauri", "TypeScript", "Hydraulique"],
     icon: Car,
     image: "/braxon-software.png",
+    links: [
+      { url: "https://github.com/rodrichgk/braxon-tauri", label: "Voir sur GitHub (app Tauri)", kind: "github" },
+      { url: "https://github.com/rodrichgk/ABS_TestBox", label: "Voir sur GitHub (conception PCB)", kind: "github" },
+    ],
   },
   {
     title: "Orphelia.net",
@@ -127,6 +137,7 @@ const PROJECTS: Project[] = [
     tags: ["Next.js", "TypeScript", "Web"],
     icon: Globe,
     image: "/orphelia.net.png",
+    links: [{ url: "https://github.com/rodrichgk/booking", label: "Voir sur GitHub", kind: "github" }],
   },
   {
     title: "Client Média « Butu »",
@@ -134,6 +145,7 @@ const PROJECTS: Project[] = [
     tags: ["Kotlin", "Jetpack Compose", "Android TV"],
     icon: Tv,
     image: "/butu-screenshot.png",
+    links: [{ url: "https://github.com/rodrichgk/Butu", label: "Voir sur GitHub", kind: "github" }],
   },
   {
     title: "Cutefish OS — Screenshot App",
@@ -141,6 +153,10 @@ const PROJECTS: Project[] = [
     tags: ["C++", "Linux", "Desktop"],
     icon: Camera,
     image: "/gabhy/projects/cutefish.jpg",
+    links: [
+      { url: "https://github.com/rodrichgk/cutefish_os_screenshot_app", label: "Voir sur GitHub (app)", kind: "github" },
+      { url: "https://github.com/rodrichgk/ScreenEventHandlerCplusplus", label: "Voir sur GitHub (gestionnaire d'événements)", kind: "github" },
+    ],
   },
   {
     title: "Robotique et Simulation",
@@ -154,7 +170,7 @@ const PROJECTS: Project[] = [
     description: "Projet mené à trois pendant le DU #ICI (IUT du Creusot), en partenariat avec le site Michelin de Blanzy : conception d'un système remplaçant les gobelets plastiques souples à usage unique des distributeurs par une solution réutilisable, avec un support lavable — en anticipation de l'interdiction du plastique à usage unique entrée en vigueur en 2021. Projet couvert par la presse locale.",
     tags: ["Michelin", "Éco-conception", "DU #ICI"],
     icon: Recycle,
-    link: { url: "https://www.lejsl.com/edition-le-creusot/2020/01/28/pour-le-recyclage-des-gobelets-plastiques-dans-les-entreprises", label: "Article — Le Journal de Saône-et-Loire" },
+    links: [{ url: "https://www.lejsl.com/edition-le-creusot/2020/01/28/pour-le-recyclage-des-gobelets-plastiques-dans-les-entreprises", label: "Article — Le Journal de Saône-et-Loire", kind: "article" }],
   },
   {
     title: "Kellefabrik.org — FabLab de Dijon",
@@ -168,6 +184,7 @@ const PROJECTS: Project[] = [
     tags: ["Arduino", "ESP32", "C++", "Drone"],
     icon: Plane,
     image: "/drone.jpg",
+    links: [{ url: "https://github.com/rodrichgk/Arduino-Based-Flight-Controller", label: "Voir sur GitHub", kind: "github" }],
   },
 ];
 
@@ -670,18 +687,31 @@ export function GabhyPortfolio() {
                           </span>
                         ))}
                       </div>
-                      {project.link && (
-                        <a
-                          href={project.link.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-2 font-body text-xs mt-4 pt-4"
-                          style={{ color: "#5fd6e8", borderTop: "1px solid rgba(153,247,255,0.1)" }}
-                        >
-                          <Newspaper size={14} />
-                          <span className="flex-1">{project.link.label}</span>
-                          <ExternalLink size={12} style={{ opacity: 0.6 }} />
-                        </a>
+                      {project.links && project.links.length > 0 && (
+                        <div className="flex flex-col gap-1.5 mt-5 pt-4" style={{ borderTop: "1px solid rgba(153,247,255,0.1)" }}>
+                          {project.links.map((link) => {
+                            const LinkIcon = link.kind === "github" ? Github : Newspaper;
+                            return (
+                              <a
+                                key={link.url}
+                                href={link.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                // The whole row is the <a> — full label text, icon, and the
+                                // padding around them are all one click target, with a hover
+                                // background so the clickable area is visually obvious too.
+                                className="flex items-center gap-2.5 font-body text-xs rounded-lg -mx-2 px-2 py-2.5 transition-colors"
+                                style={{ color: "#5fd6e8" }}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(153,247,255,0.08)")}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                              >
+                                <LinkIcon size={14} style={{ flexShrink: 0 }} />
+                                <span style={{ flex: 1 }}>{link.label}</span>
+                                <ExternalLink size={12} style={{ opacity: 0.6, flexShrink: 0 }} />
+                              </a>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
                   </motion.div>
