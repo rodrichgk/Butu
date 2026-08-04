@@ -174,11 +174,17 @@
 .landing,
 .landing * { cursor: auto !important; }
 .media-setup a,
+.media-setup a *,
 .media-setup button,
+.media-setup button *,
 .media-setup [role="button"],
+.media-setup [role="button"] *,
 .landing a,
+.landing a *,
 .landing button,
-.landing [role="button"] { cursor: pointer !important; }
+.landing button *,
+.landing [role="button"],
+.landing [role="button"] * { cursor: pointer !important; }
 .media-setup input,
 .media-setup textarea { cursor: text !important; }
 
@@ -188,7 +194,7 @@
    normal cursor and force hover-gated card info to stay visible. */
 @media (hover: none), (pointer: coarse) {
   *, *::before, *::after { cursor: auto !important; }
-  a, button, [role="button"], .focusable { cursor: pointer !important; }
+  a, a *, button, button *, [role="button"], [role="button"] *, .focusable, .focusable * { cursor: pointer !important; }
   /* Text fields should still show a caret/text cursor. */
   input, textarea { cursor: text !important; }
   /* Native-feeling taps: kill the grey/blue flash on every interactive element. */
@@ -276,8 +282,11 @@ body.gabhy-scroll * {
   cursor: auto;
 }
 body.gabhy-scroll a,
+body.gabhy-scroll a *,
 body.gabhy-scroll button,
-body.gabhy-scroll [role="button"] {
+body.gabhy-scroll button *,
+body.gabhy-scroll [role="button"],
+body.gabhy-scroll [role="button"] * {
   cursor: pointer;
 }
 /* `*:focus { outline: none; }` above is app-wide (the main app replaces it

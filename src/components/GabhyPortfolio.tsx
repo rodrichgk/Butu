@@ -202,7 +202,13 @@ const EDUCATION: EducationItem[] = [
   { period: "2018 — 2019", title: "Baccalauréat S", subtitle: "Lycée d'Excellence de Mbounda, Brazzaville" },
 ];
 
-const cardStyle = { background: "rgba(16,20,30,0.7)", border: "1px solid rgba(153,247,255,0.1)" } as const;
+const cardStyle = { 
+  background: "linear-gradient(145deg, rgba(16,20,30,0.85) 0%, rgba(12,14,20,0.95) 100%)", 
+  backdropFilter: "blur(20px)",
+  WebkitBackdropFilter: "blur(20px)",
+  border: "1px solid rgba(153,247,255,0.1)",
+  boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.05), 0 10px 30px rgba(0,0,0,0.2)"
+} as const;
 
 function scrollToId(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -491,6 +497,12 @@ export function GabhyPortfolio() {
           animate={reducedMotion ? undefined : { scale: [1.1, 1, 1.1], opacity: [0.5, 0.9, 0.5] }}
           transition={{ duration: 9, repeat: Infinity, ease: "easeInOut", delay: 1 }}
         />
+        <motion.div
+          className="pointer-events-none absolute rounded-full"
+          style={{ width: 500, height: 500, top: "20%", right: "-15%", background: "radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%)", filter: "blur(50px)" }}
+          animate={reducedMotion ? undefined : { scale: [1, 1.2, 1], opacity: [0.4, 0.8, 0.4] }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+        />
 
         <motion.div style={{ opacity: heroOpacity, y: heroY }} className="relative flex flex-col items-center">
           <ProfilePhoto />
@@ -530,17 +542,18 @@ export function GabhyPortfolio() {
           >
             <motion.button
               onClick={() => scrollToId("projects")}
-              className="w-full sm:w-auto font-display font-bold rounded-2xl"
-              style={{ background: "linear-gradient(135deg,#99f7ff,#00f1fe)", color: "#001f24", fontSize: "1rem", padding: "0.95rem 2rem", cursor: "pointer", boxShadow: "0 0 40px rgba(153,247,255,0.25)" }}
-              whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+              className="relative w-full sm:w-auto font-display font-bold rounded-2xl overflow-hidden group"
+              style={{ background: "linear-gradient(135deg,#99f7ff,#00f1fe)", color: "#001f24", fontSize: "1rem", padding: "0.95rem 2rem", cursor: "pointer", boxShadow: "0 0 40px rgba(153,247,255,0.3)" }}
+              whileHover={{ scale: 1.03, boxShadow: "0 0 50px rgba(153,247,255,0.5)" }} whileTap={{ scale: 0.97 }}
             >
+              <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" style={{ pointerEvents: "none" }} />
               Voir mes projets
             </motion.button>
             <motion.button
               onClick={() => scrollToId("contact")}
               className="w-full sm:w-auto font-display font-bold rounded-2xl"
-              style={{ background: "rgba(153,247,255,0.08)", color: "#99f7ff", fontSize: "1rem", padding: "0.95rem 2rem", cursor: "pointer", border: "1px solid rgba(153,247,255,0.3)" }}
-              whileHover={{ scale: 1.03, background: "rgba(153,247,255,0.14)" }} whileTap={{ scale: 0.97 }}
+              style={{ background: "rgba(153,247,255,0.04)", backdropFilter: "blur(12px)", color: "#99f7ff", fontSize: "1rem", padding: "0.95rem 2rem", cursor: "pointer", border: "1px solid rgba(153,247,255,0.2)" }}
+              whileHover={{ scale: 1.03, background: "rgba(153,247,255,0.1)", borderColor: "rgba(153,247,255,0.4)" }} whileTap={{ scale: 0.97 }}
             >
               Me contacter
             </motion.button>
@@ -584,7 +597,12 @@ export function GabhyPortfolio() {
               const Icon = cat.icon;
               return (
                 <Reveal key={cat.title} delay={idx * 0.08} className={idx === SKILL_CATEGORIES.length - 1 ? "sm:col-span-2 lg:col-span-1" : ""}>
-                  <div className="h-full rounded-3xl p-6 md:p-7 transition-transform duration-300 hover:-translate-y-1" style={cardStyle}>
+                  <motion.div 
+                    className="h-full rounded-3xl p-6 md:p-7" 
+                    style={cardStyle}
+                    whileHover={{ y: -6, boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.1), 0 20px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(153,247,255,0.25)" }}
+                    transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                  >
                     <div className="flex items-center justify-center w-12 h-12 rounded-2xl mb-5" style={{ background: `${cat.accent}18`, border: `1px solid ${cat.accent}40`, color: cat.accent }}>
                       <Icon size={22} />
                     </div>
@@ -597,7 +615,7 @@ export function GabhyPortfolio() {
                         </li>
                       ))}
                     </ul>
-                  </div>
+                  </motion.div>
                 </Reveal>
               );
             })}
@@ -627,7 +645,12 @@ export function GabhyPortfolio() {
                         <Wrench size={14} color={exp.current ? "#001f24" : "#99f7ff"} />
                       </div>
                     </div>
-                    <div className="flex-1 rounded-2xl p-5 md:p-6" style={cardStyle}>
+                    <motion.div 
+                      className="flex-1 rounded-2xl p-5 md:p-6" 
+                      style={cardStyle}
+                      whileHover={{ x: 6, boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.1), 0 15px 30px rgba(0,0,0,0.3), 0 0 0 1px rgba(153,247,255,0.2)" }}
+                      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                    >
                       <div className="flex flex-wrap items-center gap-2.5 mb-2">
                         <span className="font-mono-tech text-xs tracking-wide px-2.5 py-1 rounded-md" style={{ background: "rgba(153,247,255,0.1)", color: "#5fd6e8" }}>
                           {exp.period}
@@ -641,7 +664,7 @@ export function GabhyPortfolio() {
                       <h3 className="font-display font-bold text-base md:text-lg" style={{ color: "#e0e6f0" }}>{exp.role}</h3>
                       <p className="font-body text-sm font-semibold mt-0.5" style={{ color: "#99f7ff" }}>{exp.company}</p>
                       <p className="font-body text-sm mt-2.5" style={{ color: "rgba(224,230,240,0.6)", lineHeight: 1.6 }}>{exp.description}</p>
-                    </div>
+                    </motion.div>
                   </div>
                 </Reveal>
               ))}
@@ -729,7 +752,12 @@ export function GabhyPortfolio() {
           <div className="flex flex-col gap-3.5">
             {EDUCATION.map((ed, idx) => (
               <Reveal key={ed.title} delay={idx * 0.07}>
-                <div className="flex items-center gap-4 md:gap-5 rounded-2xl p-5" style={cardStyle}>
+                <motion.div 
+                  className="flex items-center gap-4 md:gap-5 rounded-2xl p-5" 
+                  style={cardStyle}
+                  whileHover={{ scale: 1.02, boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.1), 0 15px 30px rgba(0,0,0,0.3), 0 0 0 1px rgba(153,247,255,0.2)" }}
+                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                >
                   <div className="shrink-0 flex items-center justify-center w-11 h-11 md:w-12 md:h-12 rounded-xl" style={{ background: "rgba(153,247,255,0.08)", border: "1px solid rgba(153,247,255,0.2)", color: "#99f7ff" }}>
                     <GraduationCap size={20} />
                   </div>
@@ -738,7 +766,7 @@ export function GabhyPortfolio() {
                     <h3 className="font-display font-bold text-sm md:text-base" style={{ color: "#e0e6f0" }}>{ed.title}</h3>
                     {ed.subtitle && <p className="font-body text-xs md:text-sm mt-0.5" style={{ color: "rgba(224,230,240,0.55)" }}>{ed.subtitle}</p>}
                   </div>
-                </div>
+                </motion.div>
               </Reveal>
             ))}
           </div>
